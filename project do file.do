@@ -1,13 +1,12 @@
 *******************************************
 // Market Research Project 1
-// Written By: Group 5
 *******************************************
 //Cali 06 fip  Texas 48 fip
 
 clear all
 cap log close
 
-cd "C:\Users\spike\OneDrive\Documents\Qamo4700\Research Project 1"
+cd "FilePath"
 log using "Research_Project_1.smcl", replace
 use cps_project1.dta, clear
 
