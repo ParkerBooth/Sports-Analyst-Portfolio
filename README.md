@@ -15,8 +15,31 @@ This repository showcases my data analysis skills and relevant Data Analysis / S
 - [Education](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/README.md#education)
 - [Projects](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/README.md#projects)
   - R
+    
+    - [Volleyball Project Paper](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/7960%20Volleyball%20Data%20Project%20-%20Booth%20(2).pdf)
+      
+    - [Volleyball Project Presentation](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Volleyball%20Presentation.pdf)
+
   - PowerBI
+
+    - [Baseball Dashboard](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Baseball%20Dashboard.png)
+      
   - Stata
+    
+    - [Event Study Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Event%20Study%20Code.do)
+    
+    - [Learning Platform Market Research Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/4700-%20Market%20Research%20Project%20(2).pdf)
+   
+    - [Learning Platform Research Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/project%20do%20file.do)
+   
+    - [Affordable Housing Market Research Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Final%20Empirical%20Project%20(1).pdf)
+   
+    - [Affordable Housing Research Brief](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Final%20Empirical%20Project%20(1).pdf)
+   
+    - [How Smoking impacts Tax Rates](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Market%20Research%20Project%202%20(1).pdf)
+   
+    - [How Smoking impacts Tax Rates Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/ResearchProject2.do)
+  
 - [Contacts](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/README.md#contacts)
 
 
