@@ -2,11 +2,13 @@
 ## About
 Hello, I am Parker Booth! I have an analytical background in Quantitative Analysis, Business Analytics, and Econometrics. I am currently studying in the Master of Statistics program at the University of Utah. I am passionate about using my acquired data analysis skills in sports to help athletes reach their highest potential.
 
-During my studies, I have honed my analytical skills 
+During my studies, I have honed my analytical skills using economic data. I have done multiple projects with federal economic data
+
+I have experience in a sports setting at the University of Utah as a Sports Science Intern with the Applied Health & Performance Science department. This opportunity has given me 
 
 [My Resume](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Parker%20Booth%20Resume.pdf) 
 
-[LinkedIn](https://www.linkedin.com/in/parker-booth-26b81b237/)
+This repository showcases my data analysis skills and relevant projects in Data Analysis / Sports Science. 
 
 ## Table of Contents
 - [About](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/README.md#about)  
