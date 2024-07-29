@@ -5,6 +5,7 @@ Hello, I am Parker Booth! I have an analytical background in Quantitative Analys
 
 
 [My Resume](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Parker%20Booth%20Resume.pdf) 
+
 [LinkedIn](https://www.linkedin.com/in/parker-booth-26b81b237/)
 
 ## Table of Contents
