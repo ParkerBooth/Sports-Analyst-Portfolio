@@ -6,7 +6,7 @@
 // Setting up Workspace
 clear all
 cap log close
-cd "C:\Users\spike\OneDrive\Documents\Qamo4700\Research Project 2"
+cd "FilePath"
 log using "MarketResearch2.smcl", replace
 
 numlabel, add
