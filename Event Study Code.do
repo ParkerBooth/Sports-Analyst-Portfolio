@@ -1,4 +1,4 @@
-cd "C:\Users\spike\Box\QAMO4800\Research Project"
+cd "FilePath"
 use HousingPriceEventStudies.dta, clear
 
 // Keep only Mountain West States
