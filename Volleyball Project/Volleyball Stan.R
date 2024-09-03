@@ -1,8 +1,14 @@
-# Check that Data frames look correct
-View(utah_stan_df)
-View(diff_stan_df)
-View(gd1_catapult)
-View(gameday_catapult)
+# Load Libraries
+library(shinystan)
+library(rstan)
+library(bayesplot)
+library(bridgesampling)
+library(loo)
+library(matrixStats)
+library(coda)
+library(ggmcmc)
+options(mc.cores = parallel::detectCores())
+color_scheme_set("red")
 
 
 # Charting to Find Priors
@@ -51,21 +57,7 @@ curve(dnorm(x, mean = 8, sd = 4), col = "blue", lwd = 2, add = TRUE)
 
 }
 
-# Load Libraries
-library(shinystan)
-library(rstan)
-library(bayesplot)
-library(bridgesampling)
-library(loo)
-library(matrixStats)
-library(coda)
-library(ggmcmc)
-options(mc.cores = parallel::detectCores())
-color_scheme_set("red")
 
-
-# This is Useful potentially
-# print(kill_perc_stan, digits_summary=2, pars=c('beta', 'intercept'), probs = c(.025, .5, .975))
 
 
 # Logit Model on Win Dummy     Win ~ Kill % + Error % + Dig % + Serve Error % + Ace %
@@ -175,8 +167,6 @@ ppc_dens_overlay(y, yRep[1:50,])
 ppc_stat(y, yRep, stat = "mean",binwidth = .05)
 ppc_stat(y, yRep, stat = "sd",binwidth = .05)
 
-
-# Not Working Below
 
 plot(utah_stan_df$Attacking_K_Perc, utah_stan_df$Win_Dummy, xlab = "Kill %", ylab = "Wins Game", xlim = c(0, 100))
 samplesAll <- as.data.frame(rstan::extract(match_stan))
@@ -313,7 +303,7 @@ curve(1/(1+exp(-b0hat-b1hat*x)),lwd=3,add=TRUE,col="red")
 
 
 
-# regression high jumps (combine high and med) on Kill Differential    Kill Diff ~ Jumps
+# Regression high jumps (combine high and med) on Kill Differential    Kill Diff ~ Jumps
 {
 
 jumps_on_kills_model_errors_modeled = "
@@ -416,7 +406,7 @@ ppc_stat(y, yRep, stat = "sd",binwidth = .1) + xlim(0, 20)
 
 
 
-# regression jumps and player load in GD-1 on Kill Differential    Kill Diff ~ Jumps + Player Load (GD-1)
+# Regression jumps and player load in GD-1 on Kill Differential    Kill Diff ~ Jumps + Player Load (GD-1)
 {
   
 practice_jumps_errors_modeled = "
@@ -543,10 +533,6 @@ y <- gd1_catapult$Attacking_K_Perc
 ppc_dens_overlay(y, yRep[1:31,])
 ppc_stat(y, yRep, stat = "mean",binwidth = .1) + xlim(-10, 10)
 ppc_stat(y, yRep, stat = "sd",binwidth = .1) + xlim(0, 20)
-
-
-
-
 
 
 
