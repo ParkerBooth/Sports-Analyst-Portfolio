@@ -46,11 +46,11 @@ This repository showcases my data analysis skills and relevant Data Analysis / S
 
 ## Education
 
-University of Utah: 
+**University of Utah:**
 Master of Science - MS, Statistics, Econometrics Specialization
 Jan 2024 - Dec 2025
 
-University of Utah:
+**University of Utah:**
 Bachelor's degree, Quantitative Analysis of Markets & Organizations, Finance Emphasis
 Aug 2021 - Dec 2023
 
