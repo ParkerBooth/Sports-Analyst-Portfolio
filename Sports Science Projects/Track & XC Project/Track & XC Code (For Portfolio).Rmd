@@ -1,0 +1,1185 @@
+---
+title: "Track & XC"
+author: "Parker Booth"
+date: "2024-05-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Libraries
+```{r}
+library(dplyr) # Data Manipulation Package %>% 
+library(tidyr) # Data Cleaning Package
+library(readxl) # Excel
+library(tidyverse) # Cleaning/Manipulating
+library(purrr) # Initializing Lists to Data Frames
+library(lubridate) # Working with Dates
+library(openxlsx) # Excel 
+library(stringr) # String Splitting
+library(ggplot2) # Plotting
+library(stringr) # Prefix/Suffix Editing
+library(manipulate) # Easy Chart Manipulation
+library(shiny) # Interactive Charting
+library(gridExtra) # Plotting Charts Together
+library(grid) # Grid Manipulation
+library(ggcorrplot) # Correlation Chart
+library(cowplot) # Combining Charts
+library(lme4) # Hierarchical Modeling
+library(lmerTest) # More Hierarchical Modeling
+library(fmsb) # Radar Charts
+```
+
+## Initial Data Cleaning
+```{r}
+# Set Working Directory 
+setwd("Path")
+
+# Read in Force Plate Data
+xc_fp <- read_excel("Path")
+dj_top <- read_excel("Path")
+dj <- read_excel("Path", skip = 7)
+track_fp <- read_excel("Path", skip = 7)
+
+
+# Setting Date Formats
+xc_fp$`Test Date` <- as.Date(xc_fp$`Test Date`, format = "%b %d, %Y")
+dj_top$`Test Date` <- as.Date(dj_top$`Test Date`, format = "%b %d, %Y")
+dj$`Test Date` <- as.Date(dj$`Test Date`, format = "%b %d, %Y")
+track_fp$`Test Date` <- as.Date(track_fp$`Test Date`, format = "%b %d, %Y")
+
+
+# # Code to select N/A values when Needed
+# # Step 1: Count the number of NA values in each column
+# na_counts <- sapply(xc_fp, function(x) sum(is.na(x)))
+# 
+# # Convert na_counts to a data frame for easier manipulation with dplyr
+# na_counts_df <- data.frame(column = names(na_counts), na_count = na_counts)
+# 
+# # Step 2: Filter columns with NA values > 0
+# columns_with_na <- na_counts_df %>%
+#   filter(na_count > 0)
+# 
+# # OR DO THIS
+# na_columns <- xc_fp %>%
+#   select(where(~ any(is.na(.))))
+
+# Read in Rosters
+tk_roster <- read_excel("Path")
+xc_roster <- read_excel("Path")
+
+# Combine into one roster
+roster <- rbind(tk_roster, xc_roster)
+
+# Add Roster Data to all Data Frames
+xc_fp <- merge(xc_fp, roster, by = "Athlete", all.x = TRUE)
+
+xc_fp <- xc_fp %>% 
+  mutate(Distance_Category = case_when(
+    Event %in% c("LD", "5K/15") ~ "Long_Distance",
+    Event %in% c("MD", "15/5K") ~ "Medium_Distance",
+    TRUE ~ "Unknown"
+  ))
+
+xc_fp <- xc_fp %>% 
+  select(Athlete, `Test Type`, `Test Date`, Trial, Event, Distance_Category, Status, Team, everything())
+
+dj_top <- merge(dj_top, roster, by = "Athlete", all.x = TRUE)
+dj_top <- dj_top %>% 
+  select(Athlete, `Test Type`, `Test Date`, `Key Trial`, Event, Status, Team, everything())
+
+dj <- merge(dj, roster, by = "Athlete", all.x = TRUE)
+dj <- dj %>% 
+  select(Athlete, `Test Type`, `Test Date`, Trial, Event, Status, Team, everything())
+
+track_fp<- merge(track_fp, roster, by = "Athlete", all.x = TRUE)
+
+track_fp <- track_fp %>% 
+  mutate(Distance_Category = case_when(
+    Event == "400M/800M" ~ "Medium_Distance",
+    Event %in% c("Hurdles", "Sprints") ~ "Short_Distance",
+    Event == "Jumps" ~ "Jumps",
+    Event == "Multis" ~ "Multis",
+    TRUE ~ "Unknown"
+  ))
+
+track_fp <- track_fp %>% 
+  select(Athlete, `Test Type`, `Test Date`, Trial, Event, Distance_Category, Status, Team, everything())
+
+
+
+
+
+# See differences between XC & Track colnames
+track_col <- colnames(track_fp)
+xc_col <- colnames(xc_fp)
+
+unique_in_vec1 <- setdiff(track_col, xc_col)
+unique_in_vec2 <- setdiff(xc_col, track_col)
+
+# Rename a column to make it match
+names(track_fp)[names(track_fp) == "Concentric Impulse (Abs) / BM [N s]"] <- "Concentric Impulse (Abs) / BM [N s/kg]"
+
+# Combine XC & Track fp data frames
+fp <- rbind(xc_fp, track_fp)
+
+
+# Writing Cleaned Files
+setwd("C:/Users/spike/Box/AHPS Projects/AHPS Track XC Project/Exported Cleaned Files")
+
+write.xlsx(fp, "Combined CMJ Force Plate Data.xlsx", rowNames = FALSE)
+write.xlsx(roster, "Combined Roster.xlsx", rowNames = FALSE)
+write.xlsx(xc_fp, "XC CMJ Force Plate Data.xlsx", rowNames = FALSE)
+write.xlsx(track_fp, "Track CMJ Force Plate Data.xlsx", rowNames = FALSE)
+write.xlsx(dj, "DJ Force Plate Data.xlsx", rowNames = FALSE)
+write.xlsx(dj_top, "Top Trial DJ Force Plate Data.xlsx", rowNames = FALSE)
+```
+
+## Initial Exploratory Analysis
+```{r}
+
+# Initial Plotting
+ggplot(fp, aes(x = `Jump Height (Flight Time) [cm]`, y = `Peak Power / BM [W/kg]`, color = Team)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_minimal() +
+  labs(title = "Relationship between Jump Height & Peak Power (Using all force plate data)") +
+  facet_wrap(~ Distance_Category)
+
+# Re-order to easily see RSI Modified
+fp <- fp %>% 
+ select(Athlete, `Test Type`, `Test Date`, Trial, Event, Distance_Category, Status, Team, `RSI-modified [m/s]`, everything())
+
+# Create a data frame based on the best RSI-Mod in the trials 
+best_fp <- fp %>% 
+  group_by(`Test Date`, Athlete) %>%
+  slice_max(`RSI-modified [m/s]`, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+# # Writing Cleaned Files
+# setwd("C:/Users/spike/Box/AHPS Projects/AHPS Track XC Project/Exported Cleaned Files")
+# 
+# write.xlsx(best_fp, "Combined CMJ Force Plate Data (Best Jumps).xlsx", rowNames = FALSE)
+
+
+# Plotting with best trial taken
+ggplot(best_fp, aes(x = `Jump Height (Flight Time) [cm]`, y = `Peak Power / BM [W/kg]`, color = Team)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_minimal() +
+  labs(title = "Relationship between Jump Height & Peak Power (Using best jumps)") +
+  facet_wrap(~ Distance_Category)
+
+# More Plotting
+ggplot(best_fp, aes(x = `RSI-modified [m/s]`, y = `Concentric Peak Force / BM [N/kg]`, color = Team)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_minimal() +
+  labs(title = "Relationship between RSI Mod & Concentric Peak Force (Using best jumps)") +
+  facet_wrap(~ Distance_Category)
+
+ggplot(best_fp, aes(x = `RSI-modified [m/s]`, y = `Eccentric Peak Force / BM [N/kg]`, color = Team)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_minimal() +
+  labs(title = "Relationship between RSI Mod & Eccentric Peak Force (Using best jumps)") +
+  facet_wrap(~ Distance_Category)
+
+
+```
+
+## Track & XC Middle Distance Comparison using RShiny
+```{r}
+
+# Select just the medium distance group in a data frame (Only Group with XC & Track)
+med_best <- best_fp %>% 
+  filter(Distance_Category == "Medium_Distance" | Athlete %in% c("Athlete 1", "Athlete 2", "Athlete 3"))
+
+
+
+
+# Define UI for the app
+ui <- fluidPage(
+  titlePanel("Interactive ggplot with Shiny"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("yvar", "Y-axis variable:", choices = names(med_best)),
+      tableOutput("selectedPoints")
+    ),
+    mainPanel(
+      plotOutput("plot", brush = brushOpts(id = "plot_brush"))
+    )
+  )
+)
+
+
+server <- function(input, output) {
+  # Reactive expression to create the ggplot
+  plotData <- reactive({
+    y <- sym(input$yvar)
+    ggplot(med_best, aes(x = Team, y = !!y, color = Team)) +
+      geom_boxplot() +
+      theme_minimal()
+  })
+  
+  # Render the plot
+  output$plot <- renderPlot({
+    plotData()
+  })
+  
+
+}
+
+
+# Run the app
+shinyApp(ui = ui, server = server)
+
+
+```
+
+## Run Heirarchical Linear Model on Interesting Variables
+```{r}
+# Select just the medium distance group in a data frame (Only Group with XC & Track)
+med_best <- best_fp %>% 
+  filter(Distance_Category == "Medium_Distance" | Athlete %in% c("Athlete 1", "Athlete 2", "Athlete 3"))
+
+
+
+# Checking to see if variation exists between the groups
+rsi_initial_model <- lmer(`RSI-modified [m/s]` ~ 1 + (1 | Team), data = med_best)
+summary(rsi_initial_model)
+
+eccentric_model <- lmer(`Eccentric Mean Power / BM [W/kg]` ~ 1 + (1 | Team), data = med_best)
+summary(eccentric_model)
+
+concentric_model <- lmer(`Concentric Mean Power / BM [W/kg]` ~ 1 + (1 | Team), data = med_best)
+summary(concentric_model)
+
+
+ranova(rsi_initial_model)
+ranova(eccentric_model)
+ranova(concentric_model)
+
+
+
+
+
+
+
+
+# Define the function to calculate ICC
+calculate_icc <- function(var) {
+  # Fit the intercept-only model
+  model <- lmer(var ~ (1 | Team), data = med_best)
+  
+  # Extract variance components
+  var_components <- as.data.frame(VarCorr(model))
+  
+  # Calculate ICC
+  icc <- var_components$vcov[1] / (var_components$vcov[1] + var_components$vcov[2])
+  
+  return(icc)
+}
+
+# Get the column names of your data set
+example_df <- med_best %>% 
+  select_if(~!all(is.na(.)))
+  
+all_column_names <- colnames(example_df)
+
+# Drop the specific column name from the variables vector
+variables <- all_column_names[9:length(all_column_names)]
+
+
+# Initialize an empty data frame to store the results
+icc_results <- data.frame(Variable = character(), ICC = numeric(), stringsAsFactors = FALSE)
+
+# Loop through each variable
+for (variable in variables) {
+  print(variable)
+  icc <- calculate_icc(med_best[[variable]])
+  icc_results <- rbind(icc_results, data.frame(Variable = variable, ICC = icc))
+}
+
+icc_results <- icc_results %>%
+  mutate(ICC = format(ICC, scientific = FALSE)) %>% 
+  mutate(ICC = round(as.numeric(ICC), 2))
+
+
+icc_results <- icc_results %>%
+  filter(!str_detect(Variable, regex("landing", ignore_case = TRUE))) %>% 
+  filter(!str_detect(Variable, regex("Right", ignore_case = TRUE))) %>% 
+  filter(!str_detect(Variable, regex("Left", ignore_case = TRUE)))
+
+```
+
+## Comparing metrics between whole team
+```{r}
+best_xc_fp <- best_fp %>% 
+  filter(Team == "XC")
+
+best_track_fp <- best_fp %>% 
+  filter(Team == "TF")
+
+ggplot(best_xc_fp, aes(x = Distance_Category, y = `RSI-modified [m/s]`, color = Distance_Category)) +
+  geom_boxplot() +
+  theme_minimal()
+
+ggplot(best_track_fp, aes(x = Distance_Category, y = `RSI-modified [m/s]`, color = Distance_Category)) +
+  geom_boxplot() +
+  theme_minimal()
+
+
+
+
+bestish_fp <- best_fp %>% 
+  mutate(Teamish = paste0(Team, Distance_Category))
+
+# Define the specific order you want for the column
+specific_order <- c("TFJumps", "TFMultis", "TFShort_Distance", "TFMedium_Distance", "XCMedium_Distance", "XCLong_Distance", "XCUnknown")
+
+# Convert the column to a factor with the specified order
+bestish_fp <- bestish_fp %>%
+  mutate(Teamish = factor(Teamish, levels = specific_order))
+
+ggplot(bestish_fp, aes(x = Teamish, y = `RSI-modified [m/s]`, color = Team)) +
+  geom_boxplot() +
+  theme_minimal()
+
+
+
+ordering_here <- c("Order Of Athletes by Team")
+
+best2_fp <- best_fp %>% 
+  mutate(Athlete = factor(Athlete, levels = ordering_here))
+
+
+ggplot(best2_fp, aes(x = Athlete, y = `RSI-modified [m/s]`, color = Team)) +
+  geom_boxplot() +
+  labs(
+    title = "",
+    x = "") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+med2_best <- med_best %>% 
+  mutate(Athlete = factor(Athlete, levels = ordering_here))
+
+ggplot(med2_best, aes(x = Athlete, y = `RSI-modified [m/s]`, color = Team)) +
+  geom_boxplot() +
+  labs(
+    title = "",
+    x = "") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+
+column_names <- colnames(best_fp)
+concentric_columns <- column_names[grepl("Concentric", column_names)]
+
+# Print the matching column names
+print(concentric_columns)
+
+ggplot(med2_best, aes(x = Athlete, y = `Concentric RFD / BM [N/s/kg]`, color = Team)) +
+  geom_boxplot() +
+  labs(
+    title = "",
+    x = "") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+
+# Trying a Radar Charting and lollipop charting between teams on some metrics
+
+
+# Selecting the 5 variables I want to investigate
+med2_best <- med2_best %>% 
+  select(Athlete, `Test Date`, Team, `RSI-modified [m/s]`, `Eccentric Mean Force [N]`, 
+         `Concentric Mean Force [N]`, `Peak Power [W]`, `Flight Time [ms]`)
+
+# Try Team average charts
+cols_with_brackets <- colnames(med2_best)[grepl("\\[", colnames(med2_best))]
+team_avg <- med2_best %>% 
+  group_by(Team) %>%
+  summarize(across(all_of(cols_with_brackets), mean, na.rm = TRUE))
+
+team_avg <- team_avg %>% 
+  column_to_rownames("Team")
+
+team_avg <- rbind(
+  max = c(0.6, 600, 1200, 3000, 600),  # Example maximum values for each variable
+  min = c(0, 500, 1000, 2500, 500),    # Example minimum values for each variable
+  team_avg
+)
+
+
+# RUN THIS ALL AT THE SAME TIME OR IT WILL NOT WORK
+
+colors_border <- c("#FF6347", "#1E90FF")  # Colors for TF and XC
+colors_in <- c("#FF634780", "#1E90FF80")  # Transparent colors for filling
+
+
+# Create radar chart
+radarchart(team_avg,
+           axistype = 1,        # 1: Different scales for each variable
+           pcol = colors_border, # Specify colors for each group
+           pfcol = colors_in,
+           plwd = 2,            # Line width
+           plty = 3,            # Line type
+           axislabcol = "black",# Color of axis labels
+           vlcex = 0.7,         # Label cex
+           cglcol = "grey",     # Color of grid lines
+           cglty = 1,           # Grid line type
+           cglwd = 0.8,         # Grid line width
+           calcex = 0.4,
+           title = "Comparison of TF and XC Groups"  # Chart title
+)
+
+# Add a legend
+legend(x=0.9, y=1.4, legend = rownames(team_avg[-c(1,2),]), bty = "n", pch=20 , col=colors_in , text.col = "grey", cex=1.2, pt.cex=3)
+
+
+custom_labels <- c("Jumps", "Multis", "Short Dist", "Medium Dist", "Medium Dist", "Long Dist", "Unknown")
+
+
+ggplot(bestish_fp, aes(x = Teamish, y = `RSI-modified [m/s]`, color = Team)) +
+  geom_boxplot() +
+    scale_x_discrete(labels = custom_labels) + # Set custom x-axis labels
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    axis.text.y = element_text( size = 12),
+    axis.title.x = element_blank(),
+    legend.text = element_text(size = 14),       # Make legend text larger
+    legend.title = element_text(size = 16),
+    axis.title.y = element_text(face = "bold", size = 14)
+  )
+
+
+```
+
+## Adding in Running Times
+```{r}
+# Set your working directory to the folder containing your CSV files
+setwd("Path")
+
+# List all CSV files in the directory
+csv_files <- list.files(pattern = "*.csv")
+
+# Function to read a CSV file and standardize column types
+read_and_standardize <- function(file) {
+  df <- read.csv(file, stringsAsFactors = FALSE)
+  df <- mutate_all(df, as.character) # Convert all columns to character type
+  return(df)
+}
+
+# Read each CSV file with the standardization function
+list_of_dfs <- lapply(csv_files, read_and_standardize)
+
+# Combine all data frames into one
+med_race_times <- bind_rows(list_of_dfs)
+med_race_times <- distinct(med_race_times)
+
+# Assuming med_race_times is your data frame
+med_race_times <- med_race_times %>% 
+  select(-X, -X.1) %>%  # Remove columns named X and X.1 if they are present
+  mutate(Event = ifelse(Event == "600y", "600", Event))
+
+med_race_times$Date <- as.Date(med_race_times$Date, format = "%d-%b-%y")
+
+
+# Function to format times
+format_times <- function(time_str) {
+  if (str_detect(time_str, ":")) {
+    # If time is already in MM:SS.ss format, return as is
+    return(time_str)
+  } else {
+    # If time is in SS.ss format, convert to MM:SS.ss
+    seconds <- as.numeric(time_str)
+    minutes <- floor(seconds / 60)
+    remaining_seconds <- seconds %% 60
+    return(sprintf("%02d:%05.2f", minutes, remaining_seconds))
+  }
+}
+
+med_race_times <- med_race_times %>%
+  mutate(formatted_time = sapply(Time, format_times)) %>% 
+  select(-Time) %>% 
+  rename(Time = formatted_time)
+
+
+convert_to_numeric <- function(time_str) {
+  if (str_detect(time_str, ":")) {
+    parts <- str_split(time_str, ":", simplify = TRUE)
+    return(as.numeric(parts[1]) * 60 + as.numeric(parts[2]))
+  } else {
+    return(as.numeric(time_str))
+  }
+}
+
+med_race_times <- med_race_times %>%
+  mutate(NumericTime = sapply(Time, convert_to_numeric))
+
+med_race_times <- med_race_times %>% 
+  mutate(EventNumeric = case_when(
+    Event == "Mile" ~ "1600",
+    Event == "SMR" ~ "1600",
+    Event == "DMR" ~ "4000",
+    Event == "4x400" ~ "1600",
+    Event == "4x800" ~ "3200",
+    Event == "5k" ~ "5000",
+    Event == "6k" ~ "6000",
+    Event == "4x200" ~ "800",
+    Event == "4x100" ~ "400",
+    Event == "3000S" ~ "3000",
+    Event == "4x1600" ~ "6400",
+    Event == "4k" ~ "4000",
+    TRUE ~ as.character(Event)
+  )) %>% 
+  mutate(EventNumeric = as.numeric(EventNumeric))
+
+med_race_times$relay <- ifelse(grepl("x|R", med_race_times$Event), "relay", "no")
+
+# Optionally, you can write the combined data frame to a new CSV file
+setwd("Path")
+write.csv(med_race_times, "med_race_times.csv", row.names = FALSE)
+
+```
+
+## Start Comparing Running Times with Force Plates (Built the combined data frame here)
+```{r}
+med_best <- best_fp %>% 
+  filter(Distance_Category == "Medium_Distance" | Athlete %in% c("Athlete 1", "Athlete 2", "Athlete 3"))
+
+true_med_times <- med_race_times %>% 
+  filter(EventNumeric >= 400 & EventNumeric <= 3000)
+
+# Find the name with the fastest time for each event
+fastest_times <- true_med_times %>%
+  group_by(Event) %>%
+  slice(which.min(NumericTime)) %>%
+  select(Athlete, Event, Time, relay)
+
+
+# Plotting to show how close force plate tests are to races
+
+# Test Data frames
+med_fp_test <- med_best
+med_times_test <- true_med_times
+
+med_times_test$source <- "df1"
+med_fp_test$source <- "df2"
+
+med_fp_test <- med_fp_test %>% 
+  select(Athlete, `Test Date`, source) %>% 
+  rename(Date = `Test Date`)
+
+med_times_test <- med_times_test %>% 
+  select(Athlete, Date, source)
+
+# Combine both data frames
+combined_test_df <- rbind(med_fp_test, med_times_test)
+
+# Plot using ggplot2
+ggplot(combined_test_df, aes(x = Date, y = Athlete, color = source)) +
+  geom_point(size = 3, alpha = .3) +
+  scale_color_manual(values = c("df1" = "green", "df2" = "red"), labels = c("df1" = "Race", "df2" = "Test")) +
+  labs(title = "Explanatory Plot of Dates and Names",
+       x = "Date",
+       y = "Name",
+       color = "Data Source") +
+  theme_minimal() +
+  theme(legend.text = )
+
+
+
+# Setting Nearest Race variable
+
+
+# Filter out dates before 2021
+med_best <- med_best %>%
+  filter(`Test Date` >= as.Date("2021-01-01")) %>% 
+  rename(Date = `Test Date`)
+
+true_med_times <- true_med_times %>%
+  filter(Date >= as.Date("2021-01-01"))
+
+
+true_med_times <- true_med_times %>%
+  rename(Race.Date = Date)
+
+med_best <- med_best %>% 
+  rename(Test.Date = Date)
+
+
+
+# Function to get the closest test date prior to each race date
+get_closest_test_date <- function(race_date, test_dates) {
+  prior_test_dates <- test_dates[test_dates < race_date]
+  if (length(prior_test_dates) == 0) {
+    return(NA)
+  }
+  return(max(prior_test_dates))
+}
+
+# List of unique athletes
+athletes <- unique(true_med_times$Athlete)
+
+# Initialize an empty data frame to store results
+result <- data.frame()
+
+# Loop through each athlete
+for (athlete in athletes) {
+  # Filter data for the current athlete
+  race_df <- true_med_times %>% filter(Athlete == athlete)
+  test_df <- med_best %>% filter(Athlete == athlete)
+  
+  # Get the closest test date for each race date
+  race_df$ClosestTestDate <- sapply(race_df$Race.Date, get_closest_test_date, test_dates = test_df$Test.Date)
+  
+  # Append the result
+  result <- bind_rows(result, race_df)
+}
+
+# Print the final result
+print(result)
+
+result$ClosestTestDate <- as.Date(result$ClosestTestDate, format = "%b %d, %Y")
+result$DaysBeforeRace <- as.numeric(difftime(result$Race.Date, result$ClosestTestDate, units = "days"))
+
+result <- result %>% 
+  filter(!is.na(ClosestTestDate)) %>% 
+  mutate(Reliability = case_when(
+    DaysBeforeRace <= 3 ~ "Amazing",
+    DaysBeforeRace <= 10 ~ "Good",
+    DaysBeforeRace <= 25 ~ "Poor",
+    TRUE ~ "Bad")) %>% 
+  rename(Test.Date = ClosestTestDate)
+
+
+
+# Merge into one Data frame
+race_fp_med <- left_join(result, med_best, by = c("Athlete", "Test.Date"))
+
+write.xlsx(race_fp_med, "Race & FP combined.xlsx", rowNames = FALSE)
+
+```
+
+## Analysis with Running and Force Plate
+```{r}
+race_fp_med <- race_fp_med %>%
+  filter(relay != "relay") %>% 
+  filter(`RSI-modified [m/s]` <= .9)
+
+# Define UI for the app
+ui <- fluidPage(
+  titlePanel("Interactive ggplot with Shiny"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("yvar", "Y-axis variable:", choices = names(race_fp_med)),
+      tableOutput("selectedPoints")
+    ),
+    mainPanel(
+      plotOutput("plot", brush = brushOpts(id = "plot_brush"))
+    )
+  )
+)
+
+server <- function(input, output) {
+  # Reactive expression to create the ggplot
+  plotData <- reactive({
+    y <- sym(input$yvar)
+    ggplot(race_fp_med, aes(x = NumericTime, y = !!y, color = Team)) +
+      geom_point() +
+      geom_smooth(method = "lm", se = FALSE) +  # Adding a trend line with linear model
+      facet_wrap(~ Reliability) +
+      theme_minimal()
+  })
+  
+  # Render the plot
+  output$plot <- renderPlot({
+    plotData()
+  })
+}
+
+# Run the app
+shinyApp(ui = ui, server = server)
+
+
+# Try by fastest athlete
+erickson_testing <- race_fp_med %>% 
+  filter(Athlete == "Athlete 1")
+
+Avg.Reliability <-  mean(erickson_testing$DaysBeforeRace)
+
+ggplot(erickson_testing, aes(x = NumericTime, y = `RSI-modified [m/s]`)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +  # Adding a trend line with linear model
+  theme_minimal() +
+  annotate("text", x = Inf, y = Inf, label = paste("Avg # of Days (Race - Test): ", round(Avg.Reliability, 2)), 
+         hjust = 1.2, vjust = 5.5, size = 5, color = "red") +
+  facet_wrap(~Reliability)
+
+
+
+
+# Initialize an empty data frame to store results
+results <- data.frame(Athlete = character(), Slope = numeric(), AvgReliability = numeric(), stringsAsFactors = FALSE)
+
+# Loop through each athlete
+for (athlete in unique(race_fp_med$Athlete)) {
+  
+  athlete_data <- race_fp_med %>% 
+    filter(Athlete == athlete)
+  
+  lm_model <- lm(`Peak Power / BM [W/kg]` ~ NumericTime, data = athlete_data)
+  slope <- coef(lm_model)["NumericTime"]
+  
+  # Calculate average reliability
+  avg_reliability <- round(mean(athlete_data$DaysBeforeRace, na.rm = TRUE), 2)
+  
+  # Store the results in the data frame
+  results <- rbind(results, data.frame(Athlete = athlete, Slope = slope, AvgReliability = avg_reliability))
+}
+
+print(results)
+
+
+
+
+# Try out some more Hierarchical Modeling
+
+race_800 <- race_fp_med %>% 
+  filter(EventNumeric == 800)
+  
+# Sort the data frame by the Time column in descending order
+race_800 <- race_800 %>% 
+  arrange(NumericTime)
+
+race_800 <- race_800 %>% 
+  mutate(Fastest_or_Not = ifelse(row_number() <= nrow(race_800) / 4, "High", "Low")) %>% 
+  select(Fastest_or_Not, everything())
+
+race_800 <- race_800 %>% 
+  mutate(Slowest_25 = ifelse(row_number() >= (nrow(race_800) - nrow(race_800) / 4), "Slower", "Quick")) %>% 
+  select(Slowest_25, everything())
+
+# Initial Attempt at a model
+hier_800_model <- lmer(`RSI-modified [m/s]` ~ 1 + (1 | Fastest_or_Not), data = race_800)
+summary(concentric_model)
+
+
+
+
+# Define the function to calculate ICC
+calculate_icc <- function(var) {
+  # Fit the intercept-only model
+  model <- lmer(var ~ (1 | Fastest_or_Not), data = race_800)
+  
+  # Extract variance components
+  var_components <- as.data.frame(VarCorr(model))
+  
+  # Calculate ICC
+  icc <- var_components$vcov[1] / (var_components$vcov[1] + var_components$vcov[2])
+  
+  return(icc)
+}
+
+# Get the column names of your data set
+example_df <- race_800 %>% 
+  select_if(~!all(is.na(.)))
+  
+all_column_names <- colnames(example_df)
+
+# Drop the specific column name from the variables vector
+variables <- all_column_names[19:length(all_column_names)]
+
+
+# Initialize an empty data frame to store the results
+icc_results <- data.frame(Variable = character(), ICC = numeric(), stringsAsFactors = FALSE)
+
+# Loop through each variable
+for (variable in variables) {
+  print(variable)
+  icc <- calculate_icc(race_800[[variable]])
+  icc_results <- rbind(icc_results, data.frame(Variable = variable, ICC = icc))
+}
+
+icc_results <- icc_results %>%
+  mutate(ICC = format(ICC, scientific = FALSE)) %>% 
+  mutate(ICC = round(as.numeric(ICC), 2))
+
+
+icc_results <- icc_results %>%
+  filter(!str_detect(Variable, regex("landing", ignore_case = TRUE))) %>% 
+  filter(!str_detect(Variable, regex("Right", ignore_case = TRUE))) %>% 
+  filter(!str_detect(Variable, regex("Left", ignore_case = TRUE)))
+
+race_800 <- race_800 %>% 
+  filter(`RSI-modified [m/s]` <= .8)
+
+# Significant Decrease in the Peak Power once getting out of the top 25% of races
+ggplot(data = race_800, aes(x = NumericTime, y = `Peak Power / BM [W/kg]`, color = Fastest_or_Not)) +
+  geom_point() +
+  scale_x_continuous(breaks = seq(min(120), max(160), by = 2)) +
+  theme_minimal() +
+  labs(title = "800m Race") +
+  theme(legend.position = "none")
+
+
+ggplot(data = race_800, aes(x = NumericTime, y = `Force at Peak Power [N]`, color = Fastest_or_Not)) +
+  geom_point() +
+  scale_x_continuous(breaks = seq(min(120), max(160), by = 2)) +
+  theme_minimal() +
+  labs(title = "800m Race") +
+  theme(legend.position = "none")
+
+ggplot(data = race_800, aes(x = NumericTime, y = `RSI-modified [m/s]`, color = Fastest_or_Not)) +
+  geom_point() +
+  scale_x_continuous(breaks = seq(min(120), max(160), by = 2)) +
+  theme_minimal() +
+  labs(title = "800m Race") +
+  theme(legend.position = "none")
+
+
+# Do the same for the 1500 race
+race_1500 <- race_fp_med %>% 
+  filter(EventNumeric == 1500)
+  
+# Sort the data frame by the Time column in descending order
+race_1500 <- race_1500 %>% 
+  arrange(NumericTime)
+
+race_1500 <- race_1500 %>% 
+  mutate(Fastest_or_Not = ifelse(row_number() <= (nrow(race_1500) / 4), "High", "Low")) %>% 
+  select(Fastest_or_Not, `Peak Power / BM [W/kg]`, everything())
+
+ggplot(data = race_1500, aes(x = NumericTime, y = `RSI-modified [m/s]`, color = Fastest_or_Not)) +
+  geom_point() +
+  scale_x_continuous(breaks = seq(min(200), max(360), by = 5)) +
+  theme_minimal() +
+  labs(title = "1500m Race") +
+  theme(legend.position = "none")
+
+ggplot(data = race_1500, aes(x = NumericTime, y = `Eccentric Peak Force / BM [N/kg]`, color = Fastest_or_Not)) +
+  geom_point() +
+  scale_x_continuous(breaks = seq(min(200), max(360), by = 5)) +
+  theme_minimal() +
+  labs(title = "1500m Race") +
+  theme(legend.position = "none")
+
+ggplot(data = race_1500, aes(x = NumericTime, y = `Peak Power / BM [W/kg]`, color = Fastest_or_Not)) +
+  geom_point() +
+  scale_x_continuous(breaks = seq(min(200), max(360), by = 5)) +
+  theme_minimal() +
+  labs(title = "1500m Race") +
+  theme(legend.position = "none")
+
+
+
+
+ggplot(data = race_1600, aes(x = NumericTime, y = `RSI-modified [m/s]`, color = Fastest_or_Not)) +
+  geom_point() +
+  scale_x_continuous(breaks = seq(min(200), max(360), by = 5)) +
+  theme_minimal() +
+  labs(title = "1600m Race") +
+  theme(legend.position = "none")
+
+ggplot(data = race_1600, aes(x = NumericTime, y = `Eccentric Peak Force / BM [N/kg]`, color = Fastest_or_Not)) +
+  geom_point() +
+  scale_x_continuous(breaks = seq(min(200), max(360), by = 5)) +
+  theme_minimal() +
+  labs(title = "1600m Race") +
+  theme(legend.position = "none")
+
+ggplot(data = race_1600, aes(x = NumericTime, y = `Peak Power / BM [W/kg]`, color = Fastest_or_Not)) +
+  geom_point() +
+  scale_x_continuous(breaks = seq(min(200), max(360), by = 5)) +
+  theme_minimal() +
+  labs(title = "1600m Race") +
+  theme(legend.position = "none")
+
+ggplot(data = race_3000, aes(x = NumericTime, y = `RSI-modified [m/s]`, color = Fastest_or_Not)) +
+  geom_point() +
+  scale_x_continuous(breaks = seq(min(200), max(3600), by = 10)) +
+  theme_minimal() +
+  labs(title = "3000m Race") +
+  theme(legend.position = "none")
+
+ggplot(data = race_3000, aes(x = NumericTime, y = `Concentric Peak Force / BM [N/kg]`, color = Fastest_or_Not)) +
+  geom_point() +
+  scale_x_continuous(breaks = seq(min(200), max(3600), by = 10)) +
+  theme_minimal() +
+  labs(title = "3000m Race") +
+  theme(legend.position = "none")
+
+ggplot(data = race_3000, aes(x = NumericTime, y = `Peak Power / BM [W/kg]`, color = Fastest_or_Not)) +
+  geom_point() +
+  scale_x_continuous(breaks = seq(min(200), max(3600), by = 10)) +
+  theme_minimal() +
+  labs(title = "3000m Race") +
+  theme(legend.position = "none")
+
+# Reliability Ratings
+mean(race_800$DaysBeforeRace)
+table(race_800$Reliability)
+
+
+mean(race_1500$DaysBeforeRace)
+table(race_1500$Reliability)
+
+mean(race_1600$DaysBeforeRace)
+table(race_1600$Reliability)
+
+
+mean(race_3000$DaysBeforeRace)
+table(race_3000$Reliability)
+
+
+
+
+```
+
+## Set up for Radar Charting
+```{r}
+# Working with race_800
+# Take all tests from the top 2 athletes
+radar800 <- race_800 %>% 
+  mutate(top2 = ifelse(Athlete == "Athlete 1" | Athlete == "Athlete 2", "yes", "no")) %>% 
+  mutate(bottom4 = ifelse(Athlete == "Athlete 3" | Athlete == "Athlete 4" | 
+                          Athlete == "Athlete 5"| Athlete == "Athlete 6", "yes", "no"))
+
+# Select relevant variables to look into
+radar800 <- radar800 %>% 
+  select(top2, bottom4, Athlete, Race.Date, NumericTime, EventNumeric, Test.Date, DaysBeforeRace, Reliability, Team, 
+         `RSI-modified [m/s]`, `Peak Power / BM [W/kg]`, `Jump Height (Flight Time) [cm]`, 
+         `Eccentric Peak Force / BM [N/kg]`, `Concentric Peak Force / BM [N/kg]`)
+
+
+# Included top 2 racers only
+radar800_best <- radar800 %>% 
+  filter(top2 == "yes")
+
+# Include Bottom Racers 
+radar800worst <- radar800 %>% 
+  filter(bottom4 == "yes")
+  
+
+
+
+
+
+radar800 <- radar800 %>%
+  filter(Athlete != "Athlete 1")
+
+# Weighted Average
+wgt_avg_800 <- radar800 %>%
+  group_by(Athlete) %>%
+  summarise(
+    wgt_RSI = weighted.mean(`RSI-modified [m/s]`, w = 1 / DaysBeforeRace),
+    wgt_Peak_Power = weighted.mean(`Peak Power / BM [W/kg]`, w = 1 / DaysBeforeRace),
+    wgt_Jump_Height = weighted.mean(`Jump Height (Flight Time) [cm]`, w = 1 / DaysBeforeRace),
+    wgt_Ecc_Peak_Force = weighted.mean(`Eccentric Peak Force / BM [N/kg]`, w = 1 / DaysBeforeRace),
+    wgt_Con_Peak_Force = weighted.mean(`Concentric Peak Force / BM [N/kg]`, w = 1 / DaysBeforeRace)
+  )
+
+wgt_team_avg <- radar800 %>% 
+  group_by(Team) %>% 
+  summarise(
+    wgt_RSI = weighted.mean(`RSI-modified [m/s]`, w = 1 / DaysBeforeRace),
+    wgt_Peak_Power = weighted.mean(`Peak Power / BM [W/kg]`, w = 1 / DaysBeforeRace),
+    wgt_Jump_Height = weighted.mean(`Jump Height (Flight Time) [cm]`, w = 1 / DaysBeforeRace),
+    wgt_Ecc_Peak_Force = weighted.mean(`Eccentric Peak Force / BM [N/kg]`, w = 1 / DaysBeforeRace),
+    wgt_Con_Peak_Force = weighted.mean(`Concentric Peak Force / BM [N/kg]`, w = 1 / DaysBeforeRace)
+  ) %>% 
+  mutate(Athlete = ifelse(Team == "TF", "Track Average", "XC Average")) %>% 
+  select(Athlete, Team, everything())
+
+# Merge the top 2 for an average
+wgt_avg_800_top2 <- radar800_best %>% 
+  summarise(
+    wgt_RSI = weighted.mean(`RSI-modified [m/s]`, w = 1 / DaysBeforeRace),
+    wgt_Peak_Power = weighted.mean(`Peak Power / BM [W/kg]`, w = 1 / DaysBeforeRace),
+    wgt_Jump_Height = weighted.mean(`Jump Height (Flight Time) [cm]`, w = 1 / DaysBeforeRace),
+    wgt_Ecc_Peak_Force = weighted.mean(`Eccentric Peak Force / BM [N/kg]`, w = 1 / DaysBeforeRace),
+    wgt_Con_Peak_Force = weighted.mean(`Concentric Peak Force / BM [N/kg]`, w = 1 / DaysBeforeRace)
+  ) %>% 
+  mutate(Athlete = "Best Average") %>% 
+  mutate(Team = NA) %>% 
+  select(Athlete, Team, everything())
+
+# Merge bottom 4 for an average
+wgt_avg_800_bottom4 <- radar800worst %>% 
+  summarise(
+    wgt_RSI = weighted.mean(`RSI-modified [m/s]`, w = 1 / DaysBeforeRace),
+    wgt_Peak_Power = weighted.mean(`Peak Power / BM [W/kg]`, w = 1 / DaysBeforeRace),
+    wgt_Jump_Height = weighted.mean(`Jump Height (Flight Time) [cm]`, w = 1 / DaysBeforeRace),
+    wgt_Ecc_Peak_Force = weighted.mean(`Eccentric Peak Force / BM [N/kg]`, w = 1 / DaysBeforeRace),
+    wgt_Con_Peak_Force = weighted.mean(`Concentric Peak Force / BM [N/kg]`, w = 1 / DaysBeforeRace)
+  ) %>% 
+  mutate(Athlete = "Lowest Average") %>% 
+  mutate(Team = NA) %>% 
+  select(Athlete, Team, everything())
+
+
+# Combine Data Frames and re-introduce the teams
+wgt_avg_800 <- merge(wgt_avg_800, roster)
+
+wgt_avg_800 <- wgt_avg_800 %>% 
+  select(-Event, -Status)
+
+wgt_avg_800 <- rbind(wgt_team_avg, wgt_avg_800)
+wgt_avg_800 <- rbind(wgt_avg_800_top2, wgt_avg_800)
+wgt_avg_800 <- rbind(wgt_avg_800_bottom4, wgt_avg_800)
+
+
+write.xlsx(wgt_avg_800, "Weighted FP Data for Radar Charts.xlsx")
+
+
+
+```
+
+## Radar Charting
+```{r}
+library(fmsb)
+
+radarCharting <- wgt_avg_800
+
+# Standardize numeric columns
+numeric_cols <- c("wgt_RSI", "wgt_Peak_Power", "wgt_Jump_Height", "wgt_Ecc_Peak_Force", "wgt_Con_Peak_Force")
+
+min_max_normalize <- function(x) {
+  (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
+}
+
+# Apply min-max normalization to numeric columns
+radarCharting[numeric_cols] <- lapply(radarCharting[numeric_cols], min_max_normalize)
+
+averages <- radarCharting %>% 
+  filter(Athlete == "Lowest Average" | Athlete == "XC Average" | Athlete == "Track Average")
+
+averages_high <- radarCharting %>% 
+  filter(Athlete == "Best Average" | Athlete == "XC Average" | Athlete == "Track Average")
+
+averages_compared <- radarCharting %>% 
+  filter(Athlete == "Best Average" | Athlete == "Lowest Average")
+
+averages_teams <- radarCharting %>% 
+  filter(Athlete == "Track Average" | Athlete == "XC Average")
+
+# Extract numeric data for radar chart
+radar_data <- averages[, numeric_cols]
+best_radar_data <- averages_high[, numeric_cols]
+comparison_radar_data <- averages_compared[, numeric_cols]
+team_radar_data <- averages_teams[, numeric_cols]
+
+# Add max and min rows for proper scaling
+max_min <- data.frame(
+  wgt_RSI = c(1, 0),
+  wgt_Peak_Power = c(1, 0),
+  wgt_Jump_Height = c(1, 0),
+  wgt_Ecc_Peak_Force = c(1, 0),
+  wgt_Con_Peak_Force = c(1, 0))
+
+radar_data <- rbind(max_min, radar_data)
+best_radar_data <- rbind(max_min, best_radar_data)
+comparison_radar_data <- rbind(max_min, comparison_radar_data)
+team_radar_data <- rbind(max_min, team_radar_data)
+
+# Labels for each category (variables)
+labels <- c("RSI-Mod", "Peak Power", "Jump Height", "Ecc Peak Force", "Con Peak Force")
+
+
+
+# Create radar chart
+radarchart(radar_data, axistype = 1, 
+           pcol = c("#FF6347", "#4682B4", "#32CD32"), # Colors for the lines
+           plwd = c(2.5, 1.5, 1.5), # Line widths
+           plty = c(1, 2, 2), # Line types (1: solid, 2: dashed, 3: dotted)
+           vlcex = .85, vlabels = labels, # Axis labels
+           cglcol = "gray", cglty = 1, cglwd = 0.8, # Grid line customization
+           axislabcol = "blue", # Axis label color
+           caxislabels = seq(0, 1, 0.2), # Custom axis labels
+           calcex = 0.75, # Axis label size
+           pfcol = NA) # No polygon fill
+
+# Add legend
+legend("topright", legend = c("Lowest Average", "Track Average", "XC Average"), 
+       col = c("#FF6347", "#4682B4", "#32CD32"), 
+       lty = c(1, 2, 2), lwd = 2, 
+       bty = "n")
+title(main = "Lowest Timed Athletes Comparison to Team Averages")
+
+par(mar = c(1.5, 1, 1, 1))
+# Create radar chart
+radarchart(best_radar_data, axistype = 1, 
+           pcol = c("#32CD32", "#FF6347", "#4682B4"), # Colors for the lines
+           plwd = c(2.5, 1.5, 1.5), # Line widths
+           plty = c(1, 2, 2), # Line types (1: solid, 2: dashed, 3: dotted)
+           vlcex = 1.05, vlabels = labels, # Axis labels
+           cglcol = "gray", cglty = 1, cglwd = 0.8, # Grid line customization
+           axislabcol = "blue", # Axis label color
+           caxislabels = seq(0, 1, 0.2), # Custom axis labels
+           calcex = 0.75,# Axis label size
+            pfcol = c(rgb(50, 205, 50, maxColorValue = 255, alpha = 35),
+                      rgb(70, 130, 180, maxColorValue = 255, alpha = 35), # Semi-transparent fill for XC Average
+                      rgb(255, 99, 71, maxColorValue = 255, alpha = 35)))
+
+# Add legend
+legend("topright", legend = c("Best Average", "Track Average", "XC Average"), 
+       col = c("#32CD32", "#FF6347", "#4682B4"), 
+       lty = c(1, 2, 2), lwd = 2, 
+       bty = "n")
+title(main = "Best Timed Athletes Comparison to Team Averages")
+
+par(mar = c(1.5, 1, 1, 1))
+# Create radar chart
+radarchart(comparison_radar_data, axistype = 1, 
+           pcol = c("#4682B4", "#FF6347"), # Colors for the lines
+           plwd = c(2.5, 2.5), # Line widths
+           plty = c(2, 1), # Line types (1: solid, 2: dashed, 3: dotted)
+           vlcex = 1.05, vlabels = labels, # Axis labels
+           cglcol = "gray", cglty = 1, cglwd = 0.8, # Grid line customization
+           axislabcol = "blue", # Axis label color
+           caxislabels = seq(0, 1, 0.2), # Custom axis labels
+           calcex = 0.75, # Axis label size
+            pfcol = c(rgb(70, 130, 180, maxColorValue = 255, alpha = 85), # Semi-transparent fill for XC Average
+                      rgb(255, 99, 71, maxColorValue = 255, alpha = 85)))
+
+# Add legend
+legend("topright", legend = c("Best Average", "Lowest Average"), 
+       col = c("#FF6347", "#4682B4"), 
+       lty = c(1, 2), lwd = 2, 
+       bty = "n")
+title(main = "Best vs. Worst Times Comparison")
+
+
+par(mar = c(1.5, 1, 1, 1))
+# Create radar chart
+radarchart(team_radar_data, axistype = 1, 
+           pcol = c( "#FF6347", "#4682B4"), # Colors for the lines
+           plwd = c(2.5, 2.5), # Line widths
+           plty = c(2, 1), # Line types (1: solid, 2: dashed, 3: dotted)
+           vlcex = 1.05, vlabels = labels, # Axis labels
+           cglcol = "gray", cglty = 1, cglwd = 0.8, # Grid line customization
+           axislabcol = "blue", # Axis label color
+           caxislabels = seq(0, 1, 0.2), # Custom axis labels
+           calcex = 0.75, # Axis label size
+           pfcol = c(rgb(255, 99, 71, maxColorValue = 255, alpha = 85),
+                     rgb(70, 130, 180, maxColorValue = 255, alpha = 85) # Semi-transparent fill for XC Average
+                     ))
+
+# Add legend
+legend("topright", legend = c("Track Average", "XC Average"), 
+       col = c( "#FF6347", "#4682B4"), 
+       lty = c(2, 1), lwd = 2, 
+       bty = "n")
+title(main = "Track vs. XC Times Comparison (No Athlete 1)")
+```
+
+
+
