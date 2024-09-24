@@ -1,0 +1,114 @@
+---
+title: "Football Height"
+author: "Parker Booth"
+date: "2024-08-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Libraries
+```{r}
+library(dplyr) # Data Manipulation Package %>% 
+library(tidyr) # Data Cleaning Package
+library(readxl) # Excel
+library(tidyverse) # Cleaning/Manipulating
+library(purrr) # Initializing Lists to Data Frames
+library(lubridate) # Working with Dates
+library(openxlsx) # Excel 
+library(stringr) # String Splitting
+library(ggplot2) # Plotting
+library(stringr) # Prefix/Suffix Editting
+library(manipulate) # Easy Chart Manipulation
+library(shiny) # Interactive Charting
+library(gridExtra) # Plotting Charts Together
+library(grid) # Grid Manipulation
+library(ggcorrplot) # Correlation Chart
+library(cowplot) # Combining Charts
+library(lme4) # Hierarchical Modeling
+library(lmerTest) # More Hierarchical Modeling
+library(fmsb) # Radar Charts
+```
+
+## Loading In File & Cleaning
+```{r}
+
+dataset <- read.xlsx("Path")
+
+dataset$Date <- as.Date(dataset$Date, origin = "1899-12-30")
+ 
+ 
+dataset <- dataset %>% 
+  select("First.Last", "Date", "Sport",	"Position",	"Group", "DOB", "Age", "Height(in)", "Wing(in)",	"Standing_Reach(in)",	"Hand.Span(in)")
+ 
+dataset <- dataset %>% 
+  filter(Date >= "2011-07-01") %>% 
+  filter(!is.na(`Height(in)`))
+
+numberofUnique <- dataset %>%
+  distinct(First.Last, .keep_all = TRUE) %>% 
+  select(First.Last, Position)
+ 
+heightcolumn <- dataset %>%
+  group_by(First.Last) %>%
+  arrange(Date, .by_group = TRUE) %>%  # Sort by Date within each group
+  mutate(Height_Diff = `Height(in)` - first(na.omit(`Height(in)`))) %>%
+  mutate(HandSpan_Diff = `Hand.Span(in)` - first(na.omit(`Hand.Span(in)`))) %>%
+  mutate(Wingspan_Diff = `Wing(in)` - first(na.omit(`Wing(in)`))) %>%
+  mutate(Reach_Diff = `Standing_Reach(in)` - first(na.omit(`Standing_Reach(in)`))) %>%
+  mutate(HeightChange = any(Height_Diff > 0)) %>%  # New column for any positive Height_Diff per group
+  ungroup()
+
+
+changedheight <- heightcolumn %>% 
+  filter(HeightChange == TRUE) %>% 
+  filter(Height_Diff >= 0 & Height_Diff <= 3)
+
+recentchangedheight <- changedheight %>%
+  group_by(First.Last) %>%
+  slice_max(order_by = Date, n = 1) %>%
+  filter(Height_Diff > 0.2) %>% 
+  ungroup()
+
+
+ggplot(data = recentchangedheight, aes(x = Height_Diff, y = HandSpan_Diff)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  labs(title = "No Relationship Between a change in Height and Handspan",
+       x = "Height Difference",
+       y = "Hand Span Difference") +
+  theme_minimal()
+
+ggplot(data = recentchangedheight, aes(x = Height_Diff, y = Wingspan_Diff)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  labs(title = "Exteremely Small Relationship Between a change in Height and Wingspan",
+       x = "Height Difference",
+       y = "Wing Span Difference") +
+  theme_minimal()
+
+ggplot(data = recentchangedheight, aes(x = Height_Diff, y = Reach_Diff)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  labs(title = "No Relationship Between a change in Height and Reach",
+       x = "Height Difference",
+       y = "Reach Difference") +
+  theme_minimal()
+
+
+cor(recentchangedheight$Height_Diff, recentchangedheight$HandSpan_Diff, use = "complete.obs")
+cor(recentchangedheight$Height_Diff, recentchangedheight$Wingspan_Diff, use = "complete.obs")
+cor(recentchangedheight$Height_Diff, recentchangedheight$Reach_Diff, use = "complete.obs")
+
+
+
+exportingDF<- recentchangedheight %>% 
+  select(First.Last, Date, Position, Group, Height_Diff) %>% 
+  rename(Last.Measurement = Date) %>% 
+  rename(`Difference.In.Height.From.First.To.Last.Measurement (in)` = Height_Diff)
+
+write.xlsx(exportingDF, "Path")
+```
+
