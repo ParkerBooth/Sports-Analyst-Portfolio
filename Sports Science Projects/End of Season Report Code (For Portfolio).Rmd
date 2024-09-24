@@ -1,0 +1,1283 @@
+---
+title: "Basketball Season Report"
+author: "Parker Booth"
+date: "2024-03-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Libraries
+```{r}
+library(dplyr) # Data Manipulation Package %>% 
+library(tidyr) # Data Cleaning Package
+library(readxl) # Excel
+library(tidyverse) # Cleaning/Manipulating
+library(purrr) # Initializing Lists to Data Frames
+library(lubridate) # Working with Dates
+library(openxlsx) # Excel 
+library(stringr) # String Splitting
+library(ggplot2) # Plotting
+library(stringr) # Prefix/Suffix Editing
+library(manipulate) # Easy Chart Manipulation
+library(shiny) # Interactive Charting
+library(gridExtra) # Plotting Charts Together
+library(grid) # Grid Manipulation
+library(ggcorrplot) # Correlation Chart
+library(cowplot) # Combining Charts
+```
+
+## Load Datasets
+```{r}
+# Set Working Directory 
+setwd("Path")
+
+# Read in Force Plate Data
+filtered_fp <- read_excel("Path")
+
+# List of Gamedays
+gamedays <- data.frame(Gameday = c("Dates of Games"))
+
+# Format Correctly
+gamedays$Gameday <- as.Date(gamedays$Gameday, format = "%b %d, %Y")
+filtered_fp$Date <- as.Date(filtered_fp$Date)
+
+
+# Add GD-1 Column (First add nearest future game)
+filtered_fp$NearestGamedayDate <- as.Date(apply(filtered_fp, 1, function(row) {
+  date <- as.Date(row["Date"]) 
+  future_gamedays <- gamedays$Gameday[gamedays$Gameday >= date]
+  
+  if (length(future_gamedays) > 0) {
+    nearest_gameday <- min(future_gamedays)
+    days_away <- as.numeric(difftime(nearest_gameday, date, units = "days"))
+    return(nearest_gameday)
+  } else {
+    return(NA)
+  }
+}))
+
+# GD-1 Column
+filtered_fp$GamedayDiff <- as.numeric(difftime(filtered_fp$Date, filtered_fp$NearestGamedayDate, units = "days"))
+
+# Order Data frame correctly
+filtered_fp <- filtered_fp %>% 
+  select(`Athlete Name`, `Test Type`, Date, NearestGamedayDate, GamedayDiff, everything(.))
+
+# Format GD-1 Column
+filtered_fp$GamedayDiff <- paste0("GD", filtered_fp$GamedayDiff)
+
+filtered_fp <- filtered_fp %>% 
+  filter(`Athlete Name` %in% played_minutes)
+
+# Export this Data set
+# write.xlsx(filtered_fp, "23-24 MBB Force Plate Data GD identifier.xlsx", rowNames = FALSE)
+
+
+# Bring in Strive Data
+practice_strive <- read_excel("Path")
+gameday_strive <- read_excel("Path")
+
+# Keep only players who played minutes this season
+played_minutes <- c("List of Players")
+
+practice_strive <- practice_strive %>% 
+  filter(`Athlete Name` %in% played_minutes)
+
+gameday_strive <- gameday_strive %>% 
+  filter(`Athlete Name` %in% played_minutes)
+
+gameday_strive <- gameday_strive %>% 
+  mutate(Date = as.Date(Date))
+
+practice_strive <- practice_strive %>% 
+  mutate(Date = as.Date(Date))
+
+gameday_strive <- gameday_strive %>% 
+  filter(Type == "game")
+
+
+
+```
+
+## Start Looking at Decelerations
+```{r}
+gd_decels <- gameday_strive %>% 
+  select(`Athlete Name`, Date, `Decelerations (Event)`, `Low Decelerations (<250 cm/s²) (Event)`, 
+         `Medium Decelerations (<350 cm/s² >=250 cm/s²) (Event)`, `High Decelerations (>=350 cm/s²) (Event)`, 
+         `Max Deceleration (m/s²) (Event)`, `Conference/Nonconference`)
+
+gd_decels <- gd_decels %>% 
+  mutate(High_Decel_Perc = `High Decelerations (>=350 cm/s²) (Event)` / `Decelerations (Event)`) %>% 
+  mutate(Med_Decel_Perc = `Medium Decelerations (<350 cm/s² >=250 cm/s²) (Event)` / `Decelerations (Event)`) %>% 
+  mutate(Low_Decel_Perc = `Low Decelerations (<250 cm/s²) (Event)` / `Decelerations (Event)`)
+
+
+gd_decels <- gd_decels %>%
+  filter(`Decelerations (Event)` > 10)
+
+ggplot(data = gd_decels, aes(x = Date, y = Med_Decel_Perc, color = `Athlete Name`)) +
+  # geom_point(alpha = .3) +
+  # geom_line() +
+  geom_smooth(method = "lm", se = F)
+
+ggplot(data = gd_decels, aes(x = Date, y = High_Decel_Perc, color = `Athlete Name`)) +
+  # geom_point(alpha = .3) +
+  # geom_line() +
+  geom_smooth(method = "lm", se = F)
+
+
+```
+
+## Import Sport Reference Data and Calculate Decels per min played
+```{r}
+
+# Read all sheets into a list of data frames
+sheets_list <- excel_sheets("Path")
+data_list <- lapply(sheets_list, function(sheet) read_excel("Path", sheet = sheet))
+
+# Combine all data frames into one
+sports_reference <- do.call(rbind, data_list)
+
+write.xlsx(sports_reference, "sports_reference_combined.xlsx", rowNames = FALSE)
+
+
+minutes_played <- sports_reference %>% 
+  select(Name, Date, MP) %>% 
+  rename(`Athlete Name` = Name)
+
+# Add Minutes Played to gd_decels
+decels_MP <- merge(gd_decels, minutes_played, by = c("Athlete Name", "Date"), all.x = TRUE)
+
+# Checking what dates are not matching up
+# merged_df <- merge(gd_decels, minutes_played, by = c("Date", "Athlete Name"), all = TRUE)
+
+# Make decels per min columns
+decels_MP <- decels_MP %>% 
+  mutate(High_Decel_Per_Min = `High Decelerations (>=350 cm/s²) (Event)` / MP) %>% 
+  mutate(Med_Decel_Per_Min = `Medium Decelerations (<350 cm/s² >=250 cm/s²) (Event)` / MP) %>% 
+  mutate(Low_Decel_Per_Min = `Low Decelerations (<250 cm/s²) (Event)` / MP)
+
+# Keep only observations where Minutes were played
+decels_MP <- decels_MP %>% 
+  filter(MP >= 5)
+
+
+ggplot(data = decels_MP, aes(x = Date, y = High_Decel_Per_Min, color = `Athlete Name`)) +
+  # geom_point(alpha = .3) +
+  # geom_line() +
+  geom_smooth(method = "lm", se = F)
+
+ggplot(data = decels_MP, aes(x = Date, y = Med_Decel_Per_Min, color = `Athlete Name`)) +
+  geom_point(alpha = .3) +
+  geom_line() +
+  geom_smooth(method = "lm", se = F)
+
+
+```
+
+# See if same trend exists in practice
+```{r}
+# Select relevant columns
+practice_MP <- practice_strive %>% 
+  select(`Athlete Name`, Date, `Total Time (seconds)`, `Decelerations (Event)`, `Low Decelerations (<250 cm/s²) (Event)`, 
+         `Medium Decelerations (<350 cm/s² >=250 cm/s²) (Event)`, `High Decelerations (>=350 cm/s²) (Event)`)
+
+# Fix a date that had issues (session was split up into 3 different periods)
+problem_date <- practice_MP %>% 
+  filter(Date == as.Date("2023-11-26")) %>% 
+  group_by(`Athlete Name`) %>%
+  summarise(across(matches("\\("), sum)) %>% 
+  mutate(Date = as.Date("2023-11-26")) %>% 
+  select(`Athlete Name`, Date, everything())
+
+# Remove Incorrect Date and Add in corrected data
+practice_MP <- practice_MP %>% 
+  filter(Date != as.Date("2023-11-26"))
+
+practice_MP <- rbind(practice_MP, problem_date)
+
+# Remove 0 Decelerations Observations
+practice_MP <- practice_MP %>% 
+  filter(`Decelerations (Event)` > 0)
+
+# Make a column for total practice time in Minutes and calculate Decels per Min
+practice_MP <- practice_MP %>% 
+  mutate(practice_time = `Total Time (seconds)` / 60) %>% 
+  mutate(High_Decel_Per_Practice_Min = `High Decelerations (>=350 cm/s²) (Event)` / practice_time) %>% 
+  mutate(Med_Decel_Per_Practice_Min = `Medium Decelerations (<350 cm/s² >=250 cm/s²) (Event)` / practice_time) %>% 
+  mutate(Low_Decel_Per_Practice_Min = `Low Decelerations (<250 cm/s²) (Event)` / practice_time)
+
+# Make decels % columns
+practice_MP <- practice_MP %>% 
+  mutate(High_Decel_Perc = `High Decelerations (>=350 cm/s²) (Event)` / `Decelerations (Event)`) %>% 
+  mutate(Med_Decel_Perc = `Medium Decelerations (<350 cm/s² >=250 cm/s²) (Event)` / `Decelerations (Event)`) %>% 
+  mutate(Low_Decel_Perc = `Low Decelerations (<250 cm/s²) (Event)` / `Decelerations (Event)`)
+
+# Make Month Variable and Avg by month
+practice_MP$Month <- month(practice_MP$Date)
+
+avg_practice_MP <- practice_MP %>% 
+  group_by(`Athlete Name`, Month) %>% 
+  summarise(across(matches("per"), mean)) %>% 
+  ungroup()
+
+# Set months equal to numbers because it is plotting weird. 
+# 1 = Oct, 2 = Nov, 3 = Dec, 4 = Jan, 5 = Feb, 6 = Mar
+avg_practice_MP$Period <- ifelse(avg_practice_MP$Month == 3, 6, avg_practice_MP$Month)
+avg_practice_MP$Period <- ifelse(avg_practice_MP$Month == 2, 5, avg_practice_MP$Period)
+avg_practice_MP$Period <- ifelse(avg_practice_MP$Month == 1, 4, avg_practice_MP$Period)
+avg_practice_MP$Period <- ifelse(avg_practice_MP$Month == 10, 1, avg_practice_MP$Period)
+avg_practice_MP$Period <- ifelse(avg_practice_MP$Month == 11, 2, avg_practice_MP$Period)
+avg_practice_MP$Period <- ifelse(avg_practice_MP$Month == 12, 3, avg_practice_MP$Period)
+
+
+# High Per Min
+ggplot(data = avg_practice_MP, aes(x = Period, y = High_Decel_Per_Practice_Min, color = `Athlete Name`)) +
+  # geom_point(alpha = .3) +
+  geom_line(aes(group = `Athlete Name`)) + 
+  # geom_smooth(method = "lm", se = F) +
+  theme_minimal() +
+  scale_x_continuous(breaks = 1:6, labels = c("Oct", "Nov", "Dec", "Jan", "Feb", "Mar")) +
+  labs(title = "Number of High Deceleration Per Minute in Practice",
+       subtitle = "(Averaged by month)",
+       y = "High Decels Per Min") +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# Med Per Min
+ggplot(data = avg_practice_MP, aes(x = Period, y = Med_Decel_Per_Practice_Min, color = `Athlete Name`)) +
+  # geom_point(alpha = .3) +
+  geom_line(aes(group = `Athlete Name`)) + 
+  # geom_smooth(method = "lm", se = F) +
+  theme_minimal() +
+  scale_x_continuous(breaks = 1:6, labels = c("Oct", "Nov", "Dec", "Jan", "Feb", "Mar")) +
+  labs(title = "Number of Medium Deceleration Per Minute in Practice",
+       subtitle = "(Averaged by month)",
+       y = "Medium Decels Per Min") +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# High %
+ggplot(data = avg_practice_MP, aes(x = Period, y = High_Decel_Perc, color = `Athlete Name`)) +
+  # geom_point(alpha = .3) +
+  geom_line(aes(group = `Athlete Name`)) +
+  # geom_smooth(method = "lm", se = F) +
+  theme_minimal() +
+  scale_x_continuous(breaks = 1:6, labels = c("Oct", "Nov", "Dec", "Jan", "Feb", "Mar")) +
+  labs(title = "% of High Decelerations in Practice",
+       subtitle = "(Averaged by month)",
+       y = "High Decel %") +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# Med %
+ggplot(data = avg_practice_MP, aes(x = Period, y = Med_Decel_Perc, color = `Athlete Name`)) +
+  # geom_point(alpha = .3) +
+  geom_line(aes(group = `Athlete Name`)) +
+  # geom_smooth(method = "lm", se = F) +
+  theme_minimal() +
+  scale_x_continuous(breaks = 1:6, labels = c("Oct", "Nov", "Dec", "Jan", "Feb", "Mar")) +
+  labs(title = "% of Medium Deceleration Per Minute in Practice",
+       subtitle = "(Averaged by month)",
+       y = "Medium Decel %") +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+```
+
+## Shiny App for Low/Med/High Decels
+```{r}
+my_data <- gd_decels
+unique_id_column <- "Athlete Name"
+low_var <- "Low_Decel_Perc"
+med_var <- "Med_Decel_Perc"
+high_var <- "High_Decel_Perc"
+
+
+# Define the UI
+ui <- fluidPage(
+  
+  # Application title
+  titlePanel("Deceleration Data"),
+  
+  # Sidebar layout with input and output definitions
+  sidebarLayout(
+    sidebarPanel(
+      # Input: Dropdown for selecting unique ID
+      selectInput("id", "Select Unique ID", choices = unique(my_data[[unique_id_column]])),
+      br(),
+      # Instruction
+      helpText("Select a unique ID to view its data")
+    ),
+    
+    # Main panel for displaying outputs
+    mainPanel(
+      # Output: Plot for low variable
+      plotOutput("plot_low"),
+      
+      # Output: Plot for medium variable
+      plotOutput("plot_med"),
+      
+      # Output: Plot for high variable
+      plotOutput("plot_high")
+    )
+  )
+)
+
+# Define the server logic
+server <- function(input, output) {
+  
+  # Filter data based on selected unique ID
+  selected_data <- reactive({
+    my_data[my_data[[unique_id_column]] == input$id, ]
+  })
+  
+  # Generate a plot for low variable
+  output$plot_low <- renderPlot({
+    plot(selected_data()$Date, selected_data()[[low_var]], type = "b", col = "blue",
+         xlab = "Date", ylab = "Low Deceleration Percentage")
+         abline(lm(selected_data()[[low_var]] ~ selected_data()$Date), col = "purple")
+  })
+  
+  # Generate a plot for medium variable
+  output$plot_med <- renderPlot({
+    plot(selected_data()$Date, selected_data()[[med_var]], type = "b", col = "green",
+         xlab = "Date", ylab = "Medium Deceleration Percentage")
+         abline(lm(selected_data()[[med_var]] ~ selected_data()$Date), col = "purple")
+  })
+  
+  # Generate a plot for high variable
+  output$plot_high <- renderPlot({
+    plot(selected_data()$Date, selected_data()[[high_var]], type = "b", col = "red",
+         xlab = "Date", ylab = "High Deceleration Percentage")
+         abline(lm(selected_data()[[high_var]] ~ selected_data()$Date), col = "purple")
+  })
+  
+}
+
+# Create Shiny app object
+shinyApp(ui = ui, server = server)
+```
+
+## Correlation Matrix on Eccentric Variables and Decels per min
+```{r}
+
+# Select only eccentric fp values
+eccentric_fp <- filtered_fp %>% 
+  select(`Athlete Name`, Date, Trial, GamedayDiff, NearestGamedayDate, contains("Eccentric"))
+
+# Combine with High and Medium Decels
+MP_matrix_decels <- decels_MP %>% 
+  select(`Athlete Name`, Date, High_Decel_Per_Min, Med_Decel_Per_Min) %>% 
+  rename(NearestGamedayDate = Date)
+
+# Merge Data sets
+matrix_df <- merge(eccentric_fp, MP_matrix_decels, by = c("Athlete Name", "NearestGamedayDate"), all = TRUE)
+
+# COME BACK TO THIS IF MATRIX CHART WORKS
+matrix_df <- matrix_df %>% 
+  select(`Athlete Name`, Date, GamedayDiff, NearestGamedayDate, High_Decel_Per_Min, Med_Decel_Per_Min, contains("Eccentric"))
+
+
+# Drop N/A values 
+matrix_df <- matrix_df %>% 
+  filter(!is.na(Date)) %>% 
+  filter(!is.na(High_Decel_Per_Min)) %>% 
+  select(`Athlete Name`, Date, GamedayDiff, NearestGamedayDate, High_Decel_Per_Min, Med_Decel_Per_Min, contains("Eccentric")) %>% 
+  rename(HDPM = High_Decel_Per_Min) %>% 
+  rename(MDPM = Med_Decel_Per_Min)
+
+
+# Make the correlation matrix for comparing High and Med Decels to all Eccentric Variables
+
+# Select the variables for the two axes
+axis1_vars <- c("HDPM", "MDPM")  
+axis2_vars <- colnames(matrix_df)[grepl("Eccentric", colnames(matrix_df))]
+
+# Calculate correlations between the selected variables
+correlation_matrix <- cor(matrix_df[, axis1_vars], matrix_df[, axis2_vars])
+correlation_matrix_1 <- correlation_matrix[, 1:19]  # Assuming there are 57 variables in total
+correlation_matrix_2 <- correlation_matrix[, 19:37]
+correlation_matrix_3 <- correlation_matrix[, 38:57]
+# View(correlation_matrix)
+
+
+# Plot the correlation matrix
+plot1 <- ggcorrplot(correlation_matrix_1, lab = TRUE, lab_size = 3.5, show.legend = FALSE, tl.cex = 7, outline.color = "black")
+plot2 <- ggcorrplot(correlation_matrix_2, lab = TRUE, lab_size = 3.5, show.legend = FALSE, tl.cex = 7, outline.color = "black")
+plot3 <- ggcorrplot(correlation_matrix_3, lab = TRUE, lab_size = 3.5, show.legend = TRUE, tl.cex = 7, outline.color = "black")
+
+
+# Arrange the plots on a single page
+combined_plots <- plot_grid(plot1, plot2, plot3, ncol = 3, align = "hv")
+
+# Print the combined plots
+print(combined_plots)
+
+```
+
+## Correlation Matrix by Athlete
+```{r}
+# Select only eccentric fp values
+eccentric_fp <- filtered_fp %>% 
+  select(`Athlete Name`, Date, Trial, GamedayDiff, NearestGamedayDate, `RSI-modified [m/s]`, 
+         `Peak Power / BM [W/kg]`, `Jump Height (Flight Time) [cm]`, `Braking Phase Duration [s]`, contains("Eccentric"))
+
+# Combine with High and Medium Decels
+MP_matrix_decels <- decels_MP %>% 
+  select(`Athlete Name`, Date, High_Decel_Per_Min, Med_Decel_Per_Min) %>% 
+  rename(NearestGamedayDate = Date)
+
+# Merge Data sets
+matrix_df <- merge(eccentric_fp, MP_matrix_decels, by = c("Athlete Name", "NearestGamedayDate"), all = TRUE)
+
+# COME BACK TO THIS IF MATRIX CHART WORKS
+
+# Drop N/A values 
+matrix_df <- matrix_df %>% 
+  filter(!is.na(Date)) %>% 
+  filter(!is.na(High_Decel_Per_Min)) %>% 
+  select(`Athlete Name`, Date, GamedayDiff, NearestGamedayDate, High_Decel_Per_Min, Med_Decel_Per_Min, contains("Eccentric")) %>% 
+  rename(HDPM = High_Decel_Per_Min) %>% 
+  rename(MDPM = Med_Decel_Per_Min)
+
+
+# Make a data frame specific to each athlete
+athlete_matrix <- matrix_df %>% 
+  split(.$`Athlete Name`)
+
+# Define a function to calculate the correlation matrix for each athlete
+calculate_correlation_matrix <- function(data, axis_x_vars, axis_y_vars, athlete_name) {
+
+  axis1_data <- data[, axis_x_vars]
+  axis2_data <- data[, axis_y_vars]
+  
+  # Calculate correlations between the selected variables
+  correlation_matrix <- cor(axis1_data, axis2_data, method = "spearman")
+  # correlation_matrix <- cor(axis1_data, axis2_data)
+  
+  # Add on athlete name
+  rownames(correlation_matrix) <- athlete_name
+
+  return(correlation_matrix)
+}
+
+axis_x_vars <- c("HDPM")  
+axis_y_vars <- colnames(matrix_df)[grepl("Eccentric", colnames(matrix_df))]
+
+# Calculate correlation matrices for each player
+correlation_matrices <- lapply(names(athlete_matrix), function(athlete_name) {
+  calculate_correlation_matrix(athlete_matrix[[athlete_name]], axis_x_vars, axis_y_vars, athlete_name)
+})
+
+# Combine into one Data frame
+combined_matrices <- do.call(rbind, correlation_matrices)
+
+
+
+# Charting
+combined_matrices_1 <- combined_matrices[, 1:19]
+combined_matrices_2 <- combined_matrices[, 19:37]
+combined_matrices_3 <- combined_matrices[, 38:57]
+
+# Plot the correlation matrix
+a_plot1 <- ggcorrplot(combined_matrices_1, lab = TRUE, lab_size = 2, show.legend = FALSE, tl.cex = 7, outline.color = "black")
+a_plot2 <- ggcorrplot(combined_matrices_2, lab = TRUE, lab_size = 2, show.legend = FALSE, tl.cex = 7, outline.color = "black")
+a_plot3 <- ggcorrplot(combined_matrices_3, lab = TRUE, lab_size = 2, show.legend = TRUE, tl.cex = 7, outline.color = "black")
+
+
+# Arrange the plots on a single page
+a_combined_plots <- plot_grid(a_plot1, a_plot2, a_plot3, ncol = 3, align = "hv", rel_widths = c(1, 1, 1), rel_heights = c(1, 1, 1))
+
+# Print the combined plots
+print(a_combined_plots)
+
+
+
+
+
+
+
+# Do this same process with Max Decelerations ----
+
+# Select only eccentric fp values
+eccentric_fp <- filtered_fp %>% 
+  select(`Athlete Name`, Date, Trial, GamedayDiff, NearestGamedayDate, contains("Eccentric"))
+
+# Combine with High and Medium Decels
+max_matrix_decels <- decels_MP %>% 
+  select(`Athlete Name`, Date, `Max Deceleration (m/s²) (Event)`) %>% 
+  rename(NearestGamedayDate = Date)
+
+# Merge Data sets
+max_matrix_df <- merge(eccentric_fp, max_matrix_decels, by = c("Athlete Name", "NearestGamedayDate"), all = TRUE)
+
+# COME BACK TO THIS IF MATRIX CHART WORKS
+
+# Drop N/A values 
+max_matrix_df <- max_matrix_df %>% 
+  filter(!is.na(Date)) %>% 
+  filter(!is.na(`Max Deceleration (m/s²) (Event)`)) %>% 
+  select(`Athlete Name`, Date, GamedayDiff, NearestGamedayDate, `Max Deceleration (m/s²) (Event)`, contains("Eccentric")) %>% 
+  rename(Max_Decel = `Max Deceleration (m/s²) (Event)`)
+
+
+# Make a data frame specific to each athlete
+max_athlete_matrix <- max_matrix_df %>% 
+  split(.$`Athlete Name`)
+
+# Define a function to calculate the correlation matrix for each athlete
+calculate_correlation_matrix <- function(data, axis_x_vars, axis_y_vars, athlete_name) {
+
+  axis1_data <- data[, axis_x_vars]
+  axis2_data <- data[, axis_y_vars]
+  
+  # Calculate correlations between the selected variables
+  correlation_matrix <- cor(axis1_data, axis2_data)
+
+  # Add on athlete name
+  rownames(correlation_matrix) <- athlete_name
+
+  return(correlation_matrix)
+}
+
+axis_x_vars <- c("Max_Decel")  
+axis_y_vars <- colnames(matrix_df)[grepl("Eccentric", colnames(matrix_df))]
+
+# Calculate correlation matrices for each player
+correlation_matrices <- lapply(names(max_athlete_matrix), function(athlete_name) {
+  calculate_correlation_matrix(max_athlete_matrix[[athlete_name]], axis_x_vars, axis_y_vars, athlete_name)
+})
+
+# Combine into one Data frame
+combined_matrices <- do.call(rbind, correlation_matrices)
+
+
+
+# Charting
+combined_matrices_1 <- combined_matrices[, 1:19]
+combined_matrices_2 <- combined_matrices[, 19:37]
+combined_matrices_3 <- combined_matrices[, 38:57]
+
+# Plot the correlation matrix
+a_plot1 <- ggcorrplot(combined_matrices_1, lab = TRUE, lab_size = 2, show.legend = FALSE, tl.cex = 7, outline.color = "black")
+a_plot2 <- ggcorrplot(combined_matrices_2, lab = TRUE, lab_size = 2, show.legend = FALSE, tl.cex = 7, outline.color = "black")
+a_plot3 <- ggcorrplot(combined_matrices_3, lab = TRUE, lab_size = 2, show.legend = TRUE, tl.cex = 7, outline.color = "black")
+
+
+# Arrange the plots on a single page
+a_combined_plots <- plot_grid(a_plot1, a_plot2, a_plot3, ncol = 3, align = "hv", rel_widths = c(1, 1, 1), rel_heights = c(1, 1, 1))
+
+# Print the combined plots
+print(a_combined_plots)
+
+
+```
+
+## Some comparison charts for Athletes/Eccentric Variables
+```{r}
+# Specifying positions
+guards <- c("Player List")
+
+forwards <- c("Player List")
+
+# View(decels_MP) # Decels on Gameday
+# View(eccentric_fp) # Eccentric Vars
+
+# Select only eccentric fp values
+eccentric_fp <- filtered_fp %>% 
+  select(`Athlete Name`, Date, Trial, GamedayDiff, NearestGamedayDate, `RSI-modified [m/s]`, 
+         `Peak Power / BM [W/kg]`, `Jump Height (Flight Time) [cm]`, `Braking Phase Duration [s]`, contains("Eccentric"))
+
+# Keep only observations where 10 Minutes were played
+decels_MP <- decels_MP %>% 
+  filter(MP >= 10)
+
+# Add Guards/Forwards
+decels_MP <- decels_MP %>% 
+  mutate(Position = ifelse(`Athlete Name` %in% guards, "Guard", "Forward"))
+
+eccentric_fp <- eccentric_fp %>% 
+  mutate(Position = ifelse(`Athlete Name` %in% guards, "Guard", "Forward"))
+
+
+
+# Setting Months
+decels_MP$Month <- month(decels_MP$Date)
+eccentric_fp$Month <- month(eccentric_fp$Date)
+
+# Set months equal to numbers because it is plotting weird. 
+# 1 = Oct, 2 = Nov, 3 = Dec, 4 = Jan, 5 = Feb, 6 = Mar
+decels_MP$Period <- ifelse(decels_MP$Month == 3, 6, decels_MP$Month)
+decels_MP$Period <- ifelse(decels_MP$Month == 2, 5, decels_MP$Period)
+decels_MP$Period <- ifelse(decels_MP$Month == 1, 4, decels_MP$Period)
+decels_MP$Period <- ifelse(decels_MP$Month == 10, 1, decels_MP$Period)
+decels_MP$Period <- ifelse(decels_MP$Month == 11, 2, decels_MP$Period)
+decels_MP$Period <- ifelse(decels_MP$Month == 12, 3, decels_MP$Period)
+
+eccentric_fp$Period <- ifelse(eccentric_fp$Month == 3, 6, eccentric_fp$Month)
+eccentric_fp$Period <- ifelse(eccentric_fp$Month == 2, 5, eccentric_fp$Period)
+eccentric_fp$Period <- ifelse(eccentric_fp$Month == 1, 4, eccentric_fp$Period)
+eccentric_fp$Period <- ifelse(eccentric_fp$Month == 10, 1, eccentric_fp$Period)
+eccentric_fp$Period <- ifelse(eccentric_fp$Month == 11, 2, eccentric_fp$Period)
+eccentric_fp$Period <- ifelse(eccentric_fp$Month == 12, 3, eccentric_fp$Period)
+
+
+# Setting Weeks
+decels_MP <- decels_MP %>%
+  mutate(Week = ceiling(as.numeric(Date - as.Date("2023-10-29")) / 7)) %>% 
+  select(`Athlete Name`, Position, Date, Week, Month, Period, everything())
+
+eccentric_fp <- eccentric_fp %>%
+  mutate(Week = ceiling(as.numeric(Date - as.Date("2023-10-29")) / 7)) %>% 
+  select(`Athlete Name`, Position, Date, Week, Month, Period, everything())
+
+dates_MP <- decels_MP %>% 
+  select(Date, MP, `Athlete Name`) %>% 
+  rename(NearestGamedayDate = Date)
+
+eccentric_fp <- merge(dates_MP, eccentric_fp, by = c("NearestGamedayDate", "Athlete Name"), all = TRUE)
+
+eccentric_fp <- eccentric_fp %>% 
+  filter(!is.na(MP) & !is.na(Position))
+
+
+
+
+# Average Value by Week and Position
+avg_position_MP <- decels_MP %>% 
+  group_by(Position, Week) %>% 
+  summarise(HDPM = mean(High_Decel_Per_Min))
+
+# Average all Eccentric by Week/Position
+avg_eccentric_position <- eccentric_fp %>% 
+  group_by(Position, Week) %>% 
+  summarise(across(9:last_col(), mean, na.rm = TRUE))
+
+# Month Averages (Period)
+month_avg_position_MP <- decels_MP %>% 
+  group_by(Position, Period) %>% 
+  summarise(HDPM = mean(High_Decel_Per_Min))
+
+month_avg_eccentric_position <- eccentric_fp %>% 
+  group_by(Position, Period) %>% 
+  summarise(across(contains("Eccentric"), mean, na.rm = TRUE))
+
+
+# Plotting Average by week/month
+ggplot(data = avg_position_MP, aes(x = Week, y = HDPM, color = Position)) +
+  geom_line() +
+  scale_color_manual(values = c("black", "red"), labels = c("Frontcourt", "Backcourt")) +
+  labs(title = "Decelerations by Position Group",
+       subtitle = "(Averaged Weekly, Played 10+ Minutes)",
+       x = "Week",
+       y = "High Decels Per Min") +
+  scale_x_continuous(breaks = c(2, 6, 10, 14, 18), labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+  labs(color = "") +
+  coord_cartesian(ylim = c(1.5, 5.5)) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+ggplot(data = month_avg_position_MP, aes(x = Period, y = HDPM, color = Position)) +
+  geom_line() +
+  scale_color_manual(values = c("black", "red"), labels = c("Frontcourt", "Backcourt")) +
+  labs(title = "Decelerations by Position Group",
+       subtitle = "(Averaged Monthly, Played 5+ Minutes)",
+       x = "Month",
+       y = "High Decels Per Min") +
+  scale_x_continuous(breaks = 2:6, labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+  labs(color = "") +
+  coord_cartesian(ylim = c(1.5, 5.5)) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5), 
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+
+# Selecting some Eccentric Variables
+eccentric_selected <- avg_eccentric_position %>% 
+  select(Position, Week, `Eccentric Deceleration RFD [N/s]`, `Eccentric Peak Velocity [m/s]`, `Eccentric Peak Power [W]`,
+         `RSI-modified [m/s]`, `Peak Power / BM [W/kg]`, `Braking Phase Duration [s]`, `Jump Height (Flight Time) [cm]`)
+
+week_eccentric_trial1 <- merge(avg_position_MP, eccentric_selected, by = c("Position", "Week"), all = F)
+
+# Compare to Season Long Average
+week_eccentric_trial1 <- week_eccentric_trial1 %>%
+  group_by(Position) %>%
+  mutate(across(HDPM:last_col(), ~ (. - mean(.)) / mean(.) * 100, .names = "Baseline_diff_{.col}"))
+
+
+frontcourt_week_eccentric <- week_eccentric_trial1 %>% 
+  filter(Position == "Forward")
+
+backcourt_week_eccentric <- week_eccentric_trial1 %>% 
+  filter(Position == "Guard")
+
+
+
+```
+
+# Charting With Eccentric Variables
+```{r}
+# Deceleration RFD
+
+p1 <- ggplot(week_eccentric_trial1, aes(x = Week, color = Position)) +
+  geom_line(y = 0, color = "blue", linetype = "dotted") +
+  geom_line(aes(y = `Baseline_diff_Eccentric Deceleration RFD [N/s]`), linewidth = 1) +
+  geom_line(aes(y = Baseline_diff_HDPM), linetype = "dashed") + 
+  scale_color_manual(values = c("black", "red"), labels = c("Bigs", "Guards")) +
+  scale_x_continuous(breaks = c(2, 6, 10, 14, 18), labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+  scale_y_continuous(breaks = c(-25, 0, 25, 50), labels = c("-25%", "0%", "25%", "50%")) +
+  theme_minimal() +
+  coord_cartesian(ylim = c(-40, 50)) +
+  labs(title = "High Decels Compared to Deceleration RFD by Position (Averaged Weekly)",
+       subtitle = "(Dotted Line = High Decels, Solid Line = Eccentric Deceleration RFD)",
+       x = "Month",
+       y = "% Change from Season Average",
+       color = "") +
+  theme(plot.title = element_text(hjust = 0.5), 
+      plot.subtitle = element_text(hjust = 0.5))
+
+p2 <- ggplot(frontcourt_week_eccentric, aes(x = Week)) +
+  geom_line(y = 0, color = "blue", linetype = "dotted") +
+  geom_line(aes(y = `Baseline_diff_Eccentric Deceleration RFD [N/s]`, linetype = "Deceleration RFD"), linewidth = 1, color = "black") +
+  geom_line(aes(y = Baseline_diff_HDPM, linetype = "High Decels"), color = "black") + 
+  scale_x_continuous(breaks = c(2, 6, 10, 14, 18), labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+  scale_linetype_manual(name = "Bigs", 
+                      values = c("Deceleration RFD" = "solid", "High Decels" = "dashed"),
+                      labels = c("Deceleration RFD", "High Decels")) +
+  theme_minimal() +
+  coord_cartesian(ylim = c(-40, 50)) +
+  labs(title = "Decelerations Compared to Deceleration RFD (Bigs)",
+       subtitle = "(Averaged Weekly)",
+       x = "Month",
+       y = "% Change from Season Average",
+       color = "") +
+  theme(plot.title = element_text(hjust = 0.5), 
+        plot.subtitle = element_text(hjust = 0.5))
+
+p3 <- ggplot(backcourt_week_eccentric, aes(x = Week)) +
+  geom_line(y = 0, color = "blue", linetype = "dotted") +
+  geom_line(aes(y = `Baseline_diff_Eccentric Deceleration RFD [N/s]`, linetype = "Deceleration RFD"), linewidth = 1, color = "red") +
+  geom_line(aes(y = Baseline_diff_HDPM, linetype = "High Decels"), color = "red") + 
+  scale_x_continuous(breaks = c(2, 6, 10, 14, 18), labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+  scale_linetype_manual(name = "Guards", 
+                      values = c("Deceleration RFD" = "solid", "High Decels" = "dashed"),
+                      labels = c("Deceleration RFD", "High Decels")) +
+  theme_minimal() +
+  coord_cartesian(ylim = c(-40, 50)) +
+  labs(title = "Decelerations Compared to Deceleration RFD (Guards)",
+       subtitle = "(Averaged Weekly)",
+       x = "Month",
+       y = "% Change from Season Average",
+       color = "") +
+  theme(plot.title = element_text(hjust = 0.5), 
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+
+
+# Peak Power Charts
+
+  
+p4 <- ggplot(week_eccentric_trial1, aes(x = Week, color = Position)) +
+  geom_line(y = 0, color = "blue", linetype = "dotted") +
+  geom_line(aes(y = `Baseline_diff_Eccentric Peak Power [W]`), linewidth = 1) +
+  geom_line(aes(y = Baseline_diff_HDPM), linetype = "dashed") + 
+  scale_color_manual(values = c("black", "red"), labels = c("Bigs", "Guards")) +
+  scale_x_continuous(breaks = c(2, 6, 10, 14, 18), labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+  scale_y_continuous(breaks = c(-25, 0, 25, 50), labels = c("-25%", "0%", "25%", "50%")) +
+  theme_minimal() +
+  coord_cartesian(ylim = c(-40, 50)) +
+  labs(title = "High Decels Compared to Eccentric Peak Power by Position (Averaged Weekly)",
+       subtitle = "(Dotted Line = High Decels, Solid Line = Eccentric Peak Power)",
+       x = "Month",
+       y = "% Change from Season Average",
+       color = "") +
+  theme(plot.title = element_text(hjust = 0.5), 
+      plot.subtitle = element_text(hjust = 0.5))
+
+p5 <- ggplot(frontcourt_week_eccentric, aes(x = Week)) +
+  geom_line(y = 0, color = "blue", linetype = "dotted") +
+  geom_line(aes(y = `Baseline_diff_Eccentric Peak Power [W]`, linetype = "Deceleration RFD"), linewidth = 1, color = "black") +
+  geom_line(aes(y = Baseline_diff_HDPM, linetype = "High Decels"), color = "black") + 
+  scale_x_continuous(breaks = c(2, 6, 10, 14, 18), labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+  scale_linetype_manual(name = "Bigs", 
+                      values = c("Deceleration RFD" = "solid", "High Decels" = "dashed"),
+                      labels = c("Eccentric Peak Power", "High Decels")) +
+  theme_minimal() +
+  coord_cartesian(ylim = c(-40, 50)) +
+  labs(title = "Decelerations Compared to Eccentric Peak Power (Bigs)",
+       subtitle = "(Averaged Weekly)",
+       x = "Month",
+       y = "% Change from Season Average",
+       color = "") +
+  theme(plot.title = element_text(hjust = 0.5), 
+        plot.subtitle = element_text(hjust = 0.5))
+
+p6 <- ggplot(backcourt_week_eccentric, aes(x = Week)) +
+  geom_line(y = 0, color = "blue", linetype = "dotted") +
+  geom_line(aes(y = `Baseline_diff_Eccentric Peak Power [W]`, linetype = "Deceleration RFD"), linewidth = 1, color = "red") +
+  geom_line(aes(y = Baseline_diff_HDPM, linetype = "High Decels"), color = "red") + 
+  scale_x_continuous(breaks = c(2, 6, 10, 14, 18), labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+  scale_linetype_manual(name = "Guards", 
+                      values = c("Deceleration RFD" = "solid", "High Decels" = "dashed"),
+                      labels = c("Eccentric Peak Power", "High Decels")) +
+  theme_minimal() +
+  coord_cartesian(ylim = c(-40, 50)) +
+  labs(title = "Decelerations Compared to Eccentric Peak Power (Guards)",
+       subtitle = "(Averaged Weekly)",
+       x = "Month",
+       y = "% Change from Season Average",
+       color = "") +
+  theme(plot.title = element_text(hjust = 0.5), 
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+
+# Peak Velocity
+
+
+  
+p7 <- ggplot(week_eccentric_trial1, aes(x = Week, color = Position)) +
+  geom_line(y = 0, color = "blue", linetype = "dotted") +
+  geom_line(aes(y = `Baseline_diff_Eccentric Peak Velocity [m/s]`), linewidth = 1) +
+  geom_line(aes(y = Baseline_diff_HDPM), linetype = "dashed") + 
+  scale_color_manual(values = c("black", "red"), labels = c("Bigs", "Guards")) +
+  scale_x_continuous(breaks = c(2, 6, 10, 14, 18), labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+  scale_y_continuous(breaks = c(-25, 0, 25, 50), labels = c("-25%", "0%", "25%", "50%")) +
+  theme_minimal() +
+  coord_cartesian(ylim = c(-40, 50)) +
+  labs(title = "High Decels Compared to Eccentric Peak Velocity by Position (Averaged Weekly)",
+       subtitle = "(Dotted Line = High Decels, Solid Line = Eccentric Peak Velocity)",
+       x = "Month",
+       y = "% Change from Season Average",
+       color = "") +
+  theme(plot.title = element_text(hjust = 0.5), 
+      plot.subtitle = element_text(hjust = 0.5))
+
+p8 <- ggplot(frontcourt_week_eccentric, aes(x = Week)) +
+  geom_line(y = 0, color = "blue", linetype = "dotted") +
+  geom_line(aes(y = `Baseline_diff_Eccentric Peak Velocity [m/s]`, linetype = "Deceleration RFD"), linewidth = 1, color = "black") +
+  geom_line(aes(y = Baseline_diff_HDPM, linetype = "High Decels"), color = "black") + 
+  scale_x_continuous(breaks = c(2, 6, 10, 14, 18), labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+  scale_linetype_manual(name = "Bigs", 
+                      values = c("Deceleration RFD" = "solid", "High Decels" = "dashed"),
+                      labels = c("Eccentric Peak Velocity", "High Decels")) +
+  theme_minimal() +
+  coord_cartesian(ylim = c(-40, 50)) +
+  labs(title = "Decelerations Compared to Eccentric Peak Velocity (Bigs)",
+       subtitle = "(Averaged Weekly)",
+       x = "Month",
+       y = "% Change from Season Average",
+       color = "") +
+  theme(plot.title = element_text(hjust = 0.5), 
+        plot.subtitle = element_text(hjust = 0.5))
+
+p9 <- ggplot(backcourt_week_eccentric, aes(x = Week)) +
+  geom_line(y = 0, color = "blue", linetype = "dotted") +
+  geom_line(aes(y = `Baseline_diff_Eccentric Peak Velocity [m/s]`, linetype = "Deceleration RFD"), linewidth = 1, color = "red") +
+  geom_line(aes(y = Baseline_diff_HDPM, linetype = "High Decels"), color = "red") + 
+  scale_x_continuous(breaks = c(2, 6, 10, 14, 18), labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+  scale_linetype_manual(name = "Guards", 
+                      values = c("Deceleration RFD" = "solid", "High Decels" = "dashed"),
+                      labels = c("Eccentric Peak Velocity", "High Decels")) +
+  theme_minimal() +
+  coord_cartesian(ylim = c(-40, 50)) +
+  labs(title = "Decelerations Compared to Eccentric Peak Velocity (Guards)",
+       subtitle = "(Averaged Weekly)",
+       x = "Month",
+       y = "% Change from Season Average",
+       color = "") +
+  theme(plot.title = element_text(hjust = 0.5), 
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+# Printing Plots
+# Eccentric RFD
+p1
+p2
+p3
+
+# Peak Power
+p4
+p5
+p6
+
+# Peak Velocity
+p7
+p8
+p9
+
+
+# Exporting Plots as Files
+setwd("C:/Users/spike/Box/AHPS Projects/AHPS Basketball Project")
+
+# Eccentric RFD
+ggsave("10MP_Eccentric_RFD_Full.png", plot = p1, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+ggsave("10MP_Eccentric_RFD_Bigs.png", plot = p2, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+ggsave("10MP_Eccentric_RFD_Guards.png", plot = p3, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+
+# Eccentric Peak Power
+ggsave("10MP_Eccentric_Peak_Power_Full.png", plot = p4, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+ggsave("10MP_Eccentric_Peak_Power_Bigs.png", plot = p5, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+ggsave("10MP_Eccentric_Peak_Power_Guards.png", plot = p6, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+
+# Eccentric Peak Velocity
+ggsave("10MP_Eccentric_Peak_Velocity_Full.png", plot = p7, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+ggsave("10MP_Eccentric_Peak_Velocity_Bigs.png", plot = p8, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+ggsave("10MP_Eccentric_Peak_Velocity_Guards.png", plot = p9, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+
+
+```
+
+# More Deceleration Charting (Done as a Function)
+```{r}
+
+# Creating Functions for Charting
+plot_overall <- function(y_var, metric_name) {
+  ggplot(week_eccentric_trial1, aes(x = Week, color = Position)) +
+    geom_line(y = 0, color = "blue", linetype = "dotted") +
+    geom_line(aes(y = y_var) , linewidth = 1) +
+    geom_line(aes(y = Baseline_diff_HDPM), linetype = "dashed") + 
+    scale_color_manual(values = c("black", "red"), labels = c("Bigs", "Guards")) +
+    scale_x_continuous(breaks = c(2, 6, 10, 14, 18), labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+    scale_y_continuous(breaks = c(-25, 0, 25, 50), labels = c("-25%", "0%", "25%", "50%")) +
+    theme_minimal() +
+    coord_cartesian(ylim = c(-40, 50)) +
+    labs(title = paste("High Decels Compared to", metric_name, "by Position (Averaged Weekly)"),
+         subtitle = paste("Dotted Line = High Decels, Solid Line = ", metric_name, ")"),
+         x = "Month",
+         y = "% Change from Season Average",
+         color = "") +
+    theme(plot.title = element_text(hjust = 0.5, size = 16), 
+          plot.subtitle = element_text(hjust = 0.5, size = 14),
+          axis.title = element_text(size = 14))
+}
+
+plot_bigs <- function(y_var, metric_name) {
+  ggplot(frontcourt_week_eccentric, aes(x = Week)) +
+    geom_line(y = 0, color = "blue", linetype = "dotted") +
+    geom_line(aes(y = y_var, linetype = "metric"), linewidth = 1, color = "black") +
+    geom_line(aes(y = Baseline_diff_HDPM, linetype = "High Decels"), color = "black") + 
+    scale_x_continuous(breaks = c(2, 6, 10, 14, 18), labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+    scale_y_continuous(breaks = c(-25, 0, 25, 50), labels = c("-25%", "0%", "25%", "50%")) +
+    scale_linetype_manual(name = "Bigs", 
+                          values = c("metric" = "solid", "High Decels" = "dashed"),
+                          labels = c("High Decels", metric_name)) +
+    theme_minimal() +
+    coord_cartesian(ylim = c(-40, 50)) +
+    labs(title = paste("Decelerations Compared to", metric_name, "(Bigs)"),
+         subtitle = "(Averaged Weekly)",
+         x = "Month",
+         y = "% Change from Season Average",
+         color = "") +
+    theme(plot.title = element_text(hjust = 0.5, size = 16), 
+          plot.subtitle = element_text(hjust = 0.5, size = 14),
+          axis.title = element_text(size = 14))
+}
+
+plot_guards <- function(y_var, metric_name) {
+  ggplot(backcourt_week_eccentric, aes(x = Week)) +
+    geom_line(y = 0, color = "blue", linetype = "dotted") +
+    geom_line(aes(y = y_var, linetype = "metric"), linewidth = 1, color = "red") +
+    geom_line(aes(y = Baseline_diff_HDPM, linetype = "High Decels"), color = "red") + 
+    scale_x_continuous(breaks = c(2, 6, 10, 14, 18), labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+    scale_y_continuous(breaks = c(-25, 0, 25, 50), labels = c("-25%", "0%", "25%", "50%")) +
+    scale_linetype_manual(name = "Guards", 
+                          values = c("metric" = "solid", "High Decels" = "dashed"),
+                          labels = c("High Decels", metric_name)) +
+    theme_minimal() +
+    coord_cartesian(ylim = c(-40, 50)) +
+    labs(title = paste("Decelerations Compared to", metric_name, "(Guards)"),
+         subtitle = "(Averaged Weekly)",
+         x = "Month",
+         y = "% Change from Season Average",
+         color = "") +
+    theme(plot.title = element_text(hjust = 0.5, size = 16), 
+          plot.subtitle = element_text(hjust = 0.5, size = 14),
+          axis.title = element_text(size = 14))
+}
+
+
+# RSI-Modified
+p10 <- plot_overall(week_eccentric_trial1$`Baseline_diff_RSI-modified [m/s]`, "RSI-Modified")
+p11 <- plot_bigs(frontcourt_week_eccentric$`Baseline_diff_RSI-modified [m/s]`, "RSI-Modified")
+p12 <- plot_guards(backcourt_week_eccentric$`Baseline_diff_RSI-modified [m/s]`, "RSI-Modified")
+
+# Jump Height
+p13 <- plot_overall(week_eccentric_trial1$`Baseline_diff_Jump Height (Flight Time) [cm]`, "Jump Height (cm)")
+p14 <- plot_bigs(frontcourt_week_eccentric$`Baseline_diff_Jump Height (Flight Time) [cm]`, "Jump Height (cm)")
+p15 <- plot_guards(backcourt_week_eccentric$`Baseline_diff_Jump Height (Flight Time) [cm]`, "Jump Height (cm)")
+
+# Peak Power
+p16 <- plot_overall(week_eccentric_trial1$`Baseline_diff_Peak Power / BM [W/kg]`, "Peak Power")
+p17 <- plot_bigs(frontcourt_week_eccentric$`Baseline_diff_Peak Power / BM [W/kg]`, "Peak Power")
+p18 <- plot_guards(backcourt_week_eccentric$`Baseline_diff_Peak Power / BM [W/kg]`, "Peak Power")
+
+# Braking Phase Duration
+p19 <- plot_overall(week_eccentric_trial1$`Baseline_diff_Braking Phase Duration [s]`, "Braking Phase Duration")
+p20 <- plot_bigs(frontcourt_week_eccentric$`Baseline_diff_Braking Phase Duration [s]`, "Braking Phase Duration")
+p21 <- plot_guards(backcourt_week_eccentric$`Baseline_diff_Braking Phase Duration [s]`, "Braking Phase Duration")
+
+
+
+# Print all 12 Charts
+for (i in 10:21) {
+  print(get((paste0("p", i))))
+}
+
+# Exporting Plots as Files
+setwd("C:/Users/spike/Box/AHPS Projects/AHPS Basketball Project")
+
+# Saving charts
+ggsave("z_RSI-Modified_Overall.png", plot = p10, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+ggsave("z_RSI-Modified_Bigs.png", plot = p11, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+ggsave("z_RSI-Modified_Guards.png", plot = p12, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+
+ggsave("z_Jump_Height_Overall.png", plot = p13, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+ggsave("z_Jump_Height_Bigs.png", plot = p14, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+ggsave("z_Jump_Height_Guards.png", plot = p15, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+
+ggsave("z_Peak Power_Overall.png", plot = p16, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+ggsave("z_Peak Power_Bigs.png", plot = p17, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+ggsave("z_Peak Power_Guards.png", plot = p18, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+
+ggsave("z_Braking Phase Duration_Overall.png", plot = p19, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+ggsave("z_Braking Phase Duration_Bigs.png", plot = p20, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+ggsave("z_Braking Phase Duration_Guards.png", plot = p21, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+
+
+```
+
+
+# Charting without player_1
+```{r}
+
+no_player_1_decels <- decels_MP %>% 
+  filter(`Athlete Name` != "player_1")
+
+no_player_1_eccentric <- eccentric_fp %>% 
+  filter(`Athlete Name` != "player_1")
+
+# Average Value by Week and Position
+no_k_avg_position_MP <- no_player_1_decels %>% 
+  group_by(Position, Week) %>% 
+  summarise(HDPM = mean(High_Decel_Per_Min))
+
+# Average all Eccentric by Week/Position
+no_k_avg_eccentric_position <- no_player_1_eccentric %>% 
+  group_by(Position, Week) %>% 
+  summarise(across(9:last_col(), mean, na.rm = TRUE))
+
+
+
+# Plotting Average by week/month
+ggplot(data = no_k_avg_position_MP, aes(x = Week, y = HDPM, color = Position)) +
+  geom_line() +
+  scale_color_manual(values = c("black", "red"), labels = c("Frontcourt", "Backcourt")) +
+  labs(title = "Decelerations by Position Group (No player_1)",
+       subtitle = "(Averaged Weekly, Played 10+ Minutes)",
+       x = "Week",
+       y = "High Decels Per Min") +
+  scale_x_continuous(breaks = c(2, 6, 10, 14, 18), labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+  labs(color = "") +
+  coord_cartesian(ylim = c(1.5, 5.5)) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+
+# Selecting some Eccentric Variables
+no_k_eccentric_selected <- no_k_avg_eccentric_position %>% 
+  select(Position, Week, `Eccentric Deceleration RFD [N/s]`, `Eccentric Peak Velocity [m/s]`, `Eccentric Peak Power [W]`,
+         `RSI-modified [m/s]`, `Peak Power / BM [W/kg]`, `Braking Phase Duration [s]`, `Jump Height (Flight Time) [cm]`)
+
+no_k_week_eccentric_trial1 <- merge(no_k_avg_position_MP, no_k_eccentric_selected, by = c("Position", "Week"), all = F)
+
+# Compare to Season Long Average
+no_k_week_eccentric_trial1 <- no_k_week_eccentric_trial1 %>%
+  group_by(Position) %>%
+  mutate(across(HDPM:last_col(), ~ (. - mean(.)) / mean(.) * 100, .names = "Baseline_diff_{.col}"))
+
+
+no_k_frontcourt_week_eccentric <- no_k_week_eccentric_trial1 %>% 
+  filter(Position == "Forward")
+
+
+
+
+
+no_k_plot_bigs <- function(y_var, metric_name) {
+  ggplot(no_k_frontcourt_week_eccentric, aes(x = Week)) +
+    geom_line(y = 0, color = "blue", linetype = "dotted") +
+    geom_line(aes(y = y_var, linetype = "metric"), linewidth = 1, color = "black") +
+    geom_line(aes(y = Baseline_diff_HDPM, linetype = "High Decels"), color = "black") + 
+    scale_x_continuous(breaks = c(2, 6, 10, 14, 18), labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+    scale_y_continuous(breaks = c(-25, 0, 25, 50), labels = c("-25%", "0%", "25%", "50%")) +
+    scale_linetype_manual(name = "Bigs", 
+                          values = c("metric" = "solid", "High Decels" = "dashed"),
+                          labels = c("High Decels", metric_name)) +
+    theme_minimal() +
+    coord_cartesian(ylim = c(-40, 50)) +
+    labs(title = paste("Decelerations Compared to", metric_name, "(Bigs - No player_1)"),
+         subtitle = "(Averaged Weekly)",
+         x = "Month",
+         y = "% Change from Season Average",
+         color = "") +
+    theme(plot.title = element_text(hjust = 0.5, size = 16), 
+          plot.subtitle = element_text(hjust = 0.5, size = 14),
+          axis.title = element_text(size = 14))
+}
+
+k_p1 <- no_k_plot_bigs(no_k_frontcourt_week_eccentric$`Baseline_diff_RSI-modified [m/s]`, "RSI-Modified")
+k_p2 <- no_k_plot_bigs(no_k_frontcourt_week_eccentric$`Baseline_diff_Jump Height (Flight Time) [cm]`, "Jump Height (cm)")
+k_p3 <- no_k_plot_bigs(no_k_frontcourt_week_eccentric$`Baseline_diff_Peak Power / BM [W/kg]`, "Peak Power")
+k_p4 <- no_k_plot_bigs(no_k_frontcourt_week_eccentric$`Baseline_diff_Braking Phase Duration [s]`, "Braking Phase Duration")
+
+
+
+ggsave("k_RSI-Modified_Bigs.png", plot = k_p1, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+ggsave("k_Jump_Height_Bigs.png", plot = k_p2, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+ggsave("k_Peak Power_Bigs.png", plot = k_p3, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+ggsave("k_Braking Phase Duration_Bigs.png", plot = k_p4, device = "png", width = 875, height = 540, units = "px", dpi = 96)
+
+
+
+```
+
+
+# Setting Function by Player
+```{r}
+
+# Function for plotting by starters
+plotting_by_starter <- function(athlete_name) {
+
+  working_eccentric_fp <- eccentric_fp %>% 
+    filter(`Athlete Name` == athlete_name)
+  
+  working_decels_MP <- decels_MP %>% 
+    filter(`Athlete Name` == athlete_name)
+  
+  # Average Value by Week
+  working_avg_position_MP <- working_decels_MP %>% 
+    group_by(Week) %>% 
+    summarise(HDPM = mean(High_Decel_Per_Min))
+  
+  # Average all Eccentric by Week
+  working_avg_eccentric_position <- working_eccentric_fp %>% 
+    group_by(Week) %>% 
+    summarise(across(10:last_col(), mean, na.rm = TRUE))
+  
+  # Selecting some Eccentric Variables
+  working_eccentric_selected <- working_avg_eccentric_position %>% 
+    select(Week, `Eccentric Deceleration RFD [N/s]`, `Eccentric Peak Velocity [m/s]`, `Eccentric Peak Power [W]`,
+           `RSI-modified [m/s]`, `Peak Power / BM [W/kg]`, `Braking Phase Duration [s]`, `Jump Height (Flight Time) [cm]`)
+  
+  working_week_eccentric_trial <- merge(working_avg_position_MP, working_eccentric_selected, by = c("Week"), all = F)
+  
+  # Compare to Season Long Average
+  working_week_eccentric_trial <- working_week_eccentric_trial %>%
+    mutate(`Athlete Name` = athlete_name) %>% 
+    select(`Athlete Name`, Week, HDPM, everything()) %>% 
+    mutate(across(HDPM:last_col(), ~ (. - mean(.)) / mean(.) * 100, .names = "Baseline_diff_{.col}"))
+  
+  # # HDPM Plot
+  # player_name_plot_hpdm <- ggplot(data = working_week_eccentric_trial, aes(x = Week, y = HDPM)) +
+  #     geom_line() +
+  #     geom_line(y = mean(working_week_eccentric_trial$HDPM), color = "blue", linetype = "dotted") +
+  #     scale_x_continuous(breaks = c(2, 6, 10, 14, 18), labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+  #     theme_minimal() +
+  #     theme(plot.title = element_text(hjust = 0.5),
+  #         plot.subtitle = element_text(hjust = 0.5))
+
+  
+  working_week_eccentric_trial <- working_week_eccentric_trial %>%
+    rename(Eccentric_Deceleration_RFD = "Baseline_diff_Eccentric Deceleration RFD [N/s]") %>% 
+    rename(Eccentric_Peak_Velocity = "Baseline_diff_Eccentric Peak Velocity [m/s]") %>% 
+    rename(Eccentric_Peak_Power = "Baseline_diff_Eccentric Peak Power [W]") %>% 
+    rename(RSI_Modified = "Baseline_diff_RSI-modified [m/s]") %>% 
+    rename(Peak_Power = "Baseline_diff_Peak Power / BM [W/kg]") %>% 
+    rename(Braking_Phase_Duration = "Baseline_diff_Braking Phase Duration [s]") %>% 
+    rename(Jump_Height = "Baseline_diff_Jump Height (Flight Time) [cm]")
+    
+  
+  list_of_metrics <- c("Eccentric_Deceleration_RFD", "Eccentric_Peak_Velocity", "Eccentric_Peak_Power",
+                       "RSI_Modified", "Peak_Power", "Braking_Phase_Duration", "Jump_Height")
+
+  plots_list <- list()
+  
+  for (metric_name in list_of_metrics) {
+    
+    metric_name_clean <- gsub("_", " ", metric_name)
+    
+    if (metric_name == "Jump_Height") {
+    metric_name_clean <- paste(metric_name_clean, "(cm)", sep = " ")
+   }
+    
+    plot <- ggplot(working_week_eccentric_trial, aes(x = Week)) +
+                geom_line(y = 0, color = "blue", linetype = "dotted") +
+                geom_line(aes_string(y = metric_name, linetype = "'solid'"), linewidth = 1, color = "red") +
+                geom_line(aes(y = Baseline_diff_HDPM, linetype = "dashed"), color = "black") + 
+                scale_x_continuous(breaks = c(2, 6, 10, 14, 18), labels = c("Nov", "Dec", "Jan", "Feb", "Mar")) +
+                scale_y_continuous(breaks = c(-25, 0, 25, 50), labels = c("-25%", "0%", "25%", "50%")) +
+                scale_linetype_manual(name = "",
+                                      values = c(solid = "solid", dashed = "dashed"),
+                                      labels = c("High Decels", metric_name_clean)) +
+                theme_minimal() +
+                coord_cartesian(ylim = c(-50, 50)) +
+                labs(title = paste("Decelerations Compared to", metric_name_clean),
+                     subtitle = paste("(Averaged Weekly for", athlete_name, ")"),
+                     x = "Month",
+                     y = "% Change from Season Average",
+                     color = "") +
+                theme(plot.title = element_text(hjust = 0.5, size = 16), 
+                      plot.subtitle = element_text(hjust = 0.5, size = 14),
+                      axis.title = element_text(size = 14))
+    
+    
+    plots_list[[metric_name]] <- plot
+  }
+  
+  return(plots_list)
+  
+}
+
+
+starters_ish <- c("player_3",  "player_2", "player_1", "player_4", "player_5", "player_6", "player_7")
+
+player_2_Plot <- plotting_by_starter("player_2")
+player_1_HDPM_Plot <- plotting_by_starter("player_1")
+player_3_Plot <- plotting_by_starter("player_3")
+player_4_HDPM_Plot <- plotting_by_starter("player_4")
+player_5_HDPM_Plot <- plotting_by_starter("player_5")
+player_6_HDPM_Plot <- plotting_by_starter("player_6")
+player_7_HDPM_Plot <- plotting_by_starter("player_7")
+
+
+setwd("Path")
+
+output_dir <- "Path"
+
+for (metric_name in names(player2_HDPM_Plot)) {
+  plot <- cole_HDPM_Plot[[metric_name]]
+  
+  # Define the filename based on the metric name and athlete
+  filename <- paste0(output_dir, "plot_", metric_name, ".png")
+
+  # Save the plot
+  ggsave(filename, plot = plot, width = 875, height = 540, units = "px", dpi = 96)
+}
+
+```
+
+
+
+
+
+
