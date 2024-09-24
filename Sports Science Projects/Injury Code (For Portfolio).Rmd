@@ -1,0 +1,725 @@
+---
+title: "Injury"
+subtitle: "AHPS Injury Project"
+date: "2024-01-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Libraries and Datasets
+```{r}
+library(dplyr) # Data Manipulation Package %>% 
+library(tidyr) # Data Cleaning Package
+library(readxl) # Excel
+library(tidyverse) # Cleaning/Manipulating
+library(purrr) # Initializing Lists to Data Frames
+library(lubridate) # Working with Dates
+library(openxlsx) # Excel 
+library(stringr) # String Splitting
+library(ggplot2) # Plotting
+library(stringr) # Prefix/Suffix Editting
+library(manipulate) # Easy Chart Manipulation
+library(shiny) # Interactive Charting
+library(survival) # CoxPH Model
+library(gridExtra) # Plotting Charts Together
+library(grid) # Grid Manipulation 
+```
+
+## Load Dataframes
+```{r}
+
+
+# List all Files
+list_excel_files <- list.files(path = "Path", full.name = TRUE)
+
+# Function for looping through all files
+read_excel_file <- function(file) {
+  if(is.na(file)) stop("No file path") # Testing if Path exists
+df <- readxl::read_excel(file, skip = 7, col_names = TRUE)
+df$`Body Weight [kg]` <- as.numeric(df$`Body Weight [kg]`)
+df
+}
+
+# Create Initial Force plate Data frame
+fp <- purrr::map_dfr(.x = list_excel_files, .f = read_excel_file)
+
+# Correctly Format Names
+split_name <- strsplit(fp$Athlete, " ")
+
+fp$Athlete <- sapply(split_name, function(name) {
+  paste(rev(name), collapse = ", ")
+})
+
+# Convert the datetime column to a Date object
+fp$`Test Date` <- as.Date(fp$`Test Date`, format = "%Y-%m-%d")
+
+# Remove unneeded files
+rm(split_name)
+
+# Combine Athlete Standing Weights and Body Weight variables
+fp <- fp %>% 
+  mutate(`Body Weight [kg]` = coalesce(`Body Weight [kg]`, `Athlete Standing Weight [kg]`))
+
+# Remove Athlete Standing Weight
+fp$`Athlete Standing Weight [kg]` <- NULL
+
+# Export FP data frame
+write.xlsx(fp, "formatted_FP.xlsx", rowNames = FALSE)
+
+injury_df <- read_excel("Path")
+combined_fp_injury <- read_excel("Path")
+
+# Resorting Data frame
+combined_fp_injury <- combined_fp_injury %>%
+  select(incident_date, `Test Date`, DaysDifference, athlete_name, Athlete, everything())
+
+```
+
+## Formatting and Tweaking Injury Data Frame
+```{r}
+# Format some Injury Data
+# Fix one observation
+injury_df <- injury_df %>%
+  mutate(incident_sport = if_else(incident_sport == "Other - Sports", "American Football", incident_sport))
+
+
+
+# Separate Mens/Womens BBall
+
+# Function to extract sports information
+extract_sports <- function(input_string) {
+  if (grepl("Womens Basketball", input_string, ignore.case = TRUE)) {
+    return("Womens Basketball")
+  } else if (grepl("Mens Basketball", input_string, ignore.case = TRUE)) {
+    return("Mens Basketball")
+  } else {
+    return(NA)
+  }
+}
+
+# Use dplyr to apply the function to the data frame
+injury_df <- injury_df %>%
+  mutate(sports_category = sapply(sport_identity, extract_sports))
+
+
+injury_df <- injury_df %>% 
+  mutate(incident_sport = ifelse(incident_sport == "Basketball", sports_category, incident_sport))
+
+injury_df$sports_category <- NULL
+
+
+# Separate Injuries from Left / Right
+
+extract_words_between_brackets <- function(input_string) {
+  
+  # Define a regular expression pattern to match words between square brackets
+  pattern <- "\\[([^\\]]+)\\]"
+
+  # Use str_extract to find the first match of the pattern in the input string
+  match <- str_extract(input_string, pattern)
+
+  # If a match is found, extract the words; otherwise, return NA
+  if (!is.na(match)) {
+    words <- str_extract(match, "\\b\\w+\\b")
+    return(ifelse(!is.na(words), words, NA))
+  } else {
+    return(NA)
+  }
+}
+
+
+# 57 observations do not have Right/Left/Bilateral !!!!!!!!!!!!!!!
+injury_df <- injury_df %>%
+  mutate(area_of_body = sapply(issue_description, extract_words_between_brackets))
+
+# sum(is.na(injury_df$area_of_body))
+
+
+write.xlsx(injury_df, "injury_symmetry_cleaned.xlsx", rowNames = FALSE)
+
+
+```
+
+## Exploratory
+
+## Correlation and Regression Analysis on FP Metrics
+```{r}
+
+# List of metric names (replace with your actual variable names)
+metric_names <- names(combined_fp_injury)[28:ncol(combined_fp_injury)]
+
+# Remove Columns with N/A observations
+columns_with_na <- colnames(combined_fp_injury)[colSums(is.na(combined_fp_injury)) > 0]
+na_counts <- colSums(is.na(combined_fp_injury[, columns_with_na]))
+
+# Remove Columns with > 500 NA
+columns_to_remove <- columns_with_na[na_counts > 500]
+
+combined_fp_injury <- combined_fp_injury %>% 
+  select(-columns_to_remove)
+
+# Check Work
+new_columns_with_na <- colnames(combined_fp_injury)[colSums(is.na(combined_fp_injury)) > 0]
+
+# Set Up Data Frame for Slopes
+slopes_df <- data.frame(
+  Metric = character(),
+  Slope = numeric()
+)
+
+# Loop through each metric and calculate the slope
+for (metric in metric_names) {
+  model <- lm(combined_fp_injury[[metric]] ~ days_before_injury, data = combined_fp_injury)
+  slope <- coef(model)[2]  # Extract the slope
+  slopes_df <- bind_rows(slopes_df, data.frame(Metric = metric, Slope = slope))
+}
+
+correlation_df <- data.frame(
+  Metric = character(),
+  Correlation = numeric()
+)
+
+# Loop through each metric and calculate the correlation coefficient
+for (metric in metric_names) {
+  correlation <- cor(combined_fp_injury[[metric]], combined_fp_injury$days_before_injury)
+  correlation_df <- bind_rows(correlation_df, data.frame(Metric = metric, Correlation = correlation))
+}
+  
+# Looking at these relationships visually
+ggplot(data = combined_fp_injury, aes(x = days_before_injury, y = `Start of Integration [s]`)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  scale_x_reverse()
+
+
+```
+
+## Initial Analysis (Using Mens Basketball)
+```{r}
+
+# Filter to just MBB observations
+mbb_combined <- combined_fp_injury %>% 
+  filter(incident_sport == "Mens Basketball")
+
+# Select Relevant Variables
+mbb_combined <- mbb_combined %>% 
+  select(Athlete, `Test Date`, incident_date, DaysDifference, body_area, issue_description, area_of_body, 
+         `Body Weight [kg]`, `Jump Height (Flight Time) [cm]`, `Flight Time [ms]`, `RSI-modified [m/s]`, 
+         `Flight Time:Contraction Time`, `Eccentric Peak Force Asymmetry [% L,R]`, 
+         `Eccentric Deceleration RFD Asymmetry [% L,R]`, `Eccentric Deceleration RFD [N/s]`, 
+         `Eccentric Acceleration Phase Duration [s]`, `Braking Phase Duration [s]`)
+
+
+
+# Create Baseline
+# Compare Month prior to Baselines
+
+# [% L,R] - if L bigger + L smaller
+
+# Separating Data frames into Baseline and Comparisons
+baseline_mbb <- mbb_combined %>% 
+  filter(DaysDifference > 30)
+
+month_prior_mbb <- mbb_combined %>% 
+  filter(DaysDifference <= 30)
+
+# Adds Identifier to Force Plate Metric Columns
+baseline_mbb <- baseline_mbb %>% 
+  rename_at(vars(8:ncol(baseline_mbb)), ~paste("var_", ., sep = ""))
+
+# Selects median observation for each incident by athlete
+median_by_injury_observation <- baseline_mbb %>%
+  group_by(Athlete, incident_date) %>%
+  summarise(across(starts_with("var_"), median))
+
+# Removes Identifier
+baseline_mbb <- baseline_mbb %>% 
+  rename_at(vars(starts_with("var_")), ~str_remove(., "var_"))
+
+median_by_injury_observation <- median_by_injury_observation %>% 
+  rename_at(vars(starts_with("var_")), ~str_remove(., "var_"))
+
+# Athlete Specific 
+median_single_athlete <- median_by_injury_observation %>% 
+  filter(Athlete == "Athlete_1")
+
+month_before_single_athlete <- month_prior_mbb %>% 
+  filter(Athlete == "Athlete_1")
+
+# Remove Dates that do not match between data frames
+month_before_single_athlete <- month_before_single_athlete %>% 
+  filter(incident_date %in% median_single_athlete$incident_date)
+
+median_single_athlete <- median_single_athlete %>% 
+  filter(incident_date %in% month_before_single_athlete$incident_date)
+
+# Identifier for Median
+median_single_athlete <- median_single_athlete %>% 
+  rename_at(vars(3:ncol(median_single_athlete)), ~paste("med_", ., sep = ""))
+
+# Join the data frames
+combined_single_athlete <- merge(month_before_single_athlete, median_single_athlete, by = c("Athlete", "incident_date"))
+
+# Finds value of Median - Jump
+combined_single_athlete <- combined_single_athlete %>%
+  mutate(across(starts_with("med_"), 
+                list(dif = ~. - get(sub("med_", "", cur_column()))), .names = "dif_{.col}"))
+
+# Format it correctly
+combined_single_athlete <- combined_single_athlete %>%
+  mutate(across(starts_with("dif_"), ~ . * -1))
+                
+
+ggplot(data = combined_single_athlete, aes(x = DaysDifference, y = `dif_med_Eccentric Acceleration Phase Duration [s]`)) +
+  geom_point() +
+  geom_line(y = 0, col = "red") +
+  labs(x = "Days Until Injury",
+       y = "Eccentric Acceleration Phase Duration [s]") +
+  scale_x_reverse() +
+  theme_minimal()
+
+# Get Column Names that start with "dif_"
+grep("dif_", colnames(combined_single_athlete), value = TRUE)
+
+
+
+
+
+```
+
+## Applying this Analysis to whole team
+
+```{r}
+
+# Join the data frames
+combined_mbb <- merge(month_prior_mbb, median_by_injury_observation, by = c("Athlete", "incident_date"), all.x = TRUE)
+
+# Drop Values without a Baseline Value
+combined_mbb <- combined_mbb %>%
+filter(!is.na(`med_Body Weight [kg]`))
+
+# Display the number of NA values in each column
+na_counts <- colSums(is.na(combined_mbb))
+print(na_counts)
+
+# Finds value of Median - Jump
+combined_mbb <- combined_mbb %>%
+  mutate(across(starts_with("med_"),
+  list(dif = ~. - get(sub("med_", "", cur_column()))), .names = "dif_{.col}"))
+
+# Format it correctly
+combined_mbb <- combined_mbb %>%
+  mutate(across(starts_with("dif_"), ~ . * -1))
+
+
+
+# Plotted each observation by Athlete and Incident Date
+ggplot(data = combined_mbb, aes(x = DaysDifference, y = `dif_med_Jump Height (Flight Time) [cm]`, 
+                                group = interaction(Athlete, incident_date), color = Athlete)) +
+  geom_line() +
+  geom_point() +
+  geom_line(y = 0, col = "red") +
+  labs(x = "Days Until Injury") +
+  scale_x_reverse() +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  facet_wrap(~Athlete + incident_date, scales = "free", ncol = 10)
+
+# Plotted separate lines for each injury for each Athlete
+ggplot(data = combined_mbb, aes(x = DaysDifference, y = `dif_med_Jump Height (Flight Time) [cm]`, 
+                                group = interaction(Athlete, incident_date), color = incident_date)) +
+  geom_line() +
+  geom_point() +
+  geom_line(y = 0, col = "red") +
+  labs(x = "Days Until Injury") +
+  scale_x_reverse() +
+  theme_minimal() +
+  guides(color = FALSE) +
+  facet_wrap(~Athlete, scales = "free")
+
+
+
+
+#  ("dif_med_Body Weight [kg]", "dif_med_Jump Height (Flight Time) [cm]", "dif_med_Flight Time [ms]", "dif_med_RSI-modified [m/s]", 
+#                     "dif_med_Eccentric Peak Force Asymmetry [% L,R]", "dif_med_Flight Time:Contraction Time", "dif_med_Eccentric Deceleration RFD [N/s]", 
+#                     "dif_med_Eccentric Deceleration RFD Asymmetry [% L,R]", "dif_med_Eccentric Acceleration Phase Duration [s]", 
+#                     "dif_med_Braking Phase Duration[s]")
+
+
+grep("dif_", colnames(combined_mbb), value = TRUE)
+
+```
+
+## R Shiny Graph for Just Mens Basketball
+
+```{r}
+library(shiny)
+
+ui <- fluidPage(
+  selectInput("variable", "Choose Y-axis variable", choices = colnames(combined_mbb)[28:37]),
+  plotOutput("scatterPlot")
+)
+
+server <- function(input, output) {
+  output$scatterPlot <- renderPlot({
+    ggplot(data = combined_mbb, aes_string(x = "DaysDifference", y = paste0("`", input$variable, "`"))) +
+      geom_point() +
+      geom_smooth(method = "lm", se = TRUE, color = "blue") +
+      geom_line(y = 0, col = "red") +
+      labs(title = paste("Scatter Plot with", input$variable, "on Y-axis")) +
+      theme_minimal() +
+      scale_x_reverse()
+  })
+}
+
+shinyApp(ui, server)
+
+
+```
+
+## Build out R Shiny Application that allows to switch between sports
+
+## Want to filter by Sport, Variable, Injury Type
+## Where Median/Baseline is Created
+```{r}
+
+# Filter to relevant metrics
+filtered_fp <- combined_fp_injury %>% 
+  select(Athlete, `Test Date`, incident_date, incident_sport, DaysDifference, issue_description, body_area, issue_description,
+         area_of_body, `Jump Height (Flight Time) [cm]`, `Flight Time [ms]`, `RSI-modified [m/s]`, 
+         `Flight Time:Contraction Time`, `Eccentric Peak Force Asymmetry [% L,R]`, 
+         `Eccentric Deceleration RFD Asymmetry [% L,R]`, `Eccentric Deceleration RFD [N/s]`, 
+         `Eccentric Acceleration Phase Duration [s]`, `Braking Phase Duration [s]`, `Peak Power / BM [W/kg]`, 
+         `Concentric Peak Force / BM [N/kg]`, `Concentric Mean Force / BM [N/kg]`, `Concentric RFD Asymmetry [% L,R]`,
+         `Eccentric Peak Force / BM [N/kg]`, `Eccentric Mean Power / BM [W/kg]`)
+
+# Create Baseline
+# Compare Month prior to Baselines
+
+# Separating Data frames into Baseline and Comparisons
+baseline <- filtered_fp %>% 
+  filter(DaysDifference > 30)
+
+prior_month <- filtered_fp %>% 
+  filter(DaysDifference <= 30)
+
+# Adds Identifier to Force Plate Metric Columns
+baseline <- baseline %>% 
+  rename_at(vars(9:ncol(baseline)), ~paste("var_", ., sep = ""))
+
+# Selects median observation for each incident by athlete
+median_per_injury <- baseline %>%
+  group_by(Athlete, incident_date) %>%
+  summarise(across(starts_with("var_"), list(median = ~median(.))))
+
+# Remove Identifiers
+baseline <- baseline %>% 
+  rename_at(vars(starts_with("var_")), ~str_remove(., "var_"))
+
+median_per_injury <- median_per_injury %>% 
+  rename_at(vars(starts_with("var_")), ~str_remove(., "var_"))
+
+median_per_injury <- median_per_injury %>% 
+  rename_at(vars(ends_with("_median")), ~str_remove(., "_median"))
+
+
+# Identifier for Median
+median_per_injury <- median_per_injury %>% 
+  rename_at(vars(3:ncol(median_per_injury)), ~paste("med_", ., sep = ""))
+
+# Join the data frames
+median_and_prior_df <- merge(prior_month, median_per_injury, by = c("Athlete", "incident_date"), all = TRUE)
+
+# Remove Observations without Prior Month Jumps
+median_and_prior_df <- median_and_prior_df %>% 
+  filter(!is.na(`Test Date`))
+
+# Remove Obsevations without Medians
+median_and_prior_df <- median_and_prior_df %>% 
+  filter(!is.na(`med_Jump Height (Flight Time) [cm]`))
+
+
+# Finds % decrease value of Median versus the Prior Month Jump
+median_and_prior_df <- median_and_prior_df %>%
+  mutate(across(starts_with("med_"), 
+                list(pct_decrease = ~ 100 * (.- get(sub("med_", "", cur_column()))) / .),
+                .names = "pct_{.col}"))
+
+# Format it correctly
+median_and_prior_df <- median_and_prior_df %>%
+  mutate(across(starts_with("pct_"), ~ . * -1))
+
+# Final Dataframe with All Sports, FP data, and Injuries
+# median_and_prior_df
+```
+
+## R Shiny Application with Toggle for Sport and Metric
+
+```{r}
+# Add Mechanism
+
+ui <- fluidPage(
+  selectInput("metric", "Choose Y-axis Metric", choices = sort(colnames(median_and_prior_df)[39:53])),
+  selectInput("incident_sport", "Choose Sport", choices = c("Overall", sort(unique(median_and_prior_df$incident_sport)))),
+  selectInput("body_area", "Choose Injury", choices = c("Overall", sort(unique(median_and_prior_df$body_area)))),
+  selectInput("area_of_body", "Choose Area of Body", choices = c("Overall", sort(unique(median_and_prior_df$area_of_body)))),
+  plotOutput("scatterPlot")
+)
+
+server <- function(input, output, session) {
+  
+  output$scatterPlot <- renderPlot({
+    
+  filtered_data <- median_and_prior_df %>%
+    filter(
+      (input$incident_sport == "Overall" | incident_sport == input$incident_sport) &
+      (input$body_area == "Overall" | body_area == input$body_area) &
+      (input$area_of_body == "Overall" | area_of_body == input$area_of_body))
+      
+    ggplot(data = filtered_data, aes_string(x = "DaysDifference", y = paste0("`", input$metric, "`"))) +
+      geom_line(y = 0, col = "red", size = .5, alpha = .25) +
+      geom_point() +
+      geom_smooth(method = "lm", se = TRUE, color = "blue") +
+      labs(title = paste("Correlation with Days before Injury and", input$metric),
+           subtitle = paste("Sport:", input$incident_sport, "   ", 
+                            "Injury:", input$body_area,  "   ", 
+                            "Body Area:", input$area_of_body)) +
+      theme_minimal() +
+      scale_x_reverse()
+  })
+  
+  # Fixes Closing Issues
+    session$onSessionEnded(function() {
+    stopApp()
+  })
+
+    
+}
+
+
+
+shinyApp(ui, server)
+
+# grep("dif_", colnames(median_and_prior_df), value = TRUE)
+
+# Flight Time and Jump Height for Basketball look good
+# Peak Power for LAX/Soccer negative before, and increases towards injury
+```
+
+## Basketball Relationship
+
+```{r}
+
+bball_median_df <- median_and_prior_df %>% 
+  filter(incident_sport == "Mens Basketball" | incident_sport == "Womens Basketball")
+
+# dif_med_Jump Height (Flight Time) [cm]
+# dif_med_Flight Time [ms]
+
+
+# Chart/Regression
+# ggplot(data = bball_median_df, aes(x = DaysDifference, y = `pct_med_Jump Height (Flight Time) [cm]`)) +
+#   geom_point() +
+#   geom_smooth(method = "lm", se = TRUE, color = "blue") +
+#   scale_x_reverse()
+
+# bball_model <- lm(`pct_med_Jump Height (Flight Time) [cm]` ~ DaysDifference, data = bball_median_df)
+# summary(bball_model)
+# confint(bball_model, level = .95)
+
+
+
+# Select Relevant Columns
+bball_median_df <- bball_median_df %>% 
+  select(colnames(bball_median_df)[1:8], `pct_med_Jump Height (Flight Time) [cm]`, `pct_med_Flight Time [ms]`)
+
+# Separate into another data frame to see if Three Day Grouping is better or not
+three_day_bball <- bball_median_df
+
+# Another dataframe for just Ankle Injuries
+ankle_bball <- bball_median_df %>% 
+  filter(body_area == "Ankle")
+
+# Separate ankle three day average
+three_day_ankle <- ankle_bball
+
+# Get average by days difference
+bball_median_df <- bball_median_df %>% 
+  group_by(DaysDifference) %>% 
+  mutate(averaged_Flight_Time = mean(`pct_med_Flight Time [ms]`)) %>% 
+  mutate(averaged_Jump_Height = mean(`pct_med_Jump Height (Flight Time) [cm]`)) %>% 
+  ungroup()
+
+# Get average by days for ankles
+ankle_bball <- ankle_bball %>% 
+  group_by(DaysDifference) %>% 
+  mutate(averaged_Flight_Time = mean(`pct_med_Flight Time [ms]`)) %>% 
+  mutate(averaged_Jump_Height = mean(`pct_med_Jump Height (Flight Time) [cm]`)) %>% 
+  ungroup()
+
+# Get average by 3 day groupings
+three_day_bball <- three_day_bball %>% 
+  mutate(grouped_time = (DaysDifference - 1) %/% 3) %>% 
+  mutate(grouped_time = ifelse(grouped_time == -1, 0, grouped_time)) %>% 
+  group_by(grouped_time) %>% 
+  mutate(averaged_Flight_Time = mean(`pct_med_Flight Time [ms]`)) %>% 
+  mutate(averaged_Jump_Height = mean(`pct_med_Jump Height (Flight Time) [cm]`)) %>% 
+  ungroup()
+
+# Get average by 3 day groupings
+three_day_ankle <- three_day_ankle %>% 
+  mutate(grouped_time = (DaysDifference - 1) %/% 3) %>% 
+  mutate(grouped_time = ifelse(grouped_time == -1, 0, grouped_time)) %>% 
+  group_by(grouped_time) %>% 
+  mutate(averaged_Flight_Time = mean(`pct_med_Flight Time [ms]`)) %>% 
+  mutate(averaged_Jump_Height = mean(`pct_med_Jump Height (Flight Time) [cm]`)) %>% 
+  ungroup()
+
+
+# All Periods Charting
+p1 <- ggplot(data = bball_median_df, aes(x = DaysDifference, y = averaged_Jump_Height)) +
+  geom_line() +
+  geom_line(y = 0, color = "blue") +
+  geom_line(y = mean(bball_median_df$averaged_Jump_Height), color = "red", linetype = "dotted") + 
+  scale_x_reverse() +
+  theme_minimal() +
+  labs(x = "",
+       y = "% Change in Jump Height",
+       title = "Jump Height Decreases Prior to Injury",
+       subtitle = "(For Mens and Womens Basketball)") +
+  theme(plot.title = element_text(hjust = 0.5, vjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5, vjust = 0.5),
+        text = element_text(size = 20)) +
+  annotate("text", x = 1, y = -1.75, 
+           label = paste("Mean:", round(mean(bball_median_df$averaged_Jump_Height), 2)),
+           fontface = "bold", size = 5)
+
+# Ankle Charting
+p2 <- ggplot(data = ankle_bball, aes(x = DaysDifference, y = averaged_Jump_Height)) +
+  geom_line() +
+  geom_line(y = 0, color = "blue") +
+  geom_line(y = mean(ankle_bball$averaged_Jump_Height), color = "red", linetype = "dotted") + 
+  scale_x_reverse() +
+  theme_minimal() +
+  labs(x = "",
+       y = "",
+       title = "Jump Height Decreases Prior to Ankle Injury",
+       subtitle = "(For Mens and Womens Basketball)") +
+  theme(plot.title = element_text(hjust = 0.5, vjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5, vjust = 0.5),
+        text = element_text(size = 20)) +
+  annotate("text", x = 1.25, y = -2, 
+           label = paste("Mean:", round(mean(ankle_bball$averaged_Jump_Height), 2)),
+           fontface = "bold", size = 5)
+
+# 3 Day Periods
+p3 <- ggplot(data = three_day_bball, aes(x = DaysDifference, y = averaged_Jump_Height)) +
+  geom_line() +
+  geom_line(y = 0, color = "blue") +
+  geom_line(y = mean(three_day_bball$averaged_Jump_Height), color = "red", linetype = "dotted") +
+  scale_x_reverse() +
+  theme_minimal() +
+  labs(x = "Days Until Injury",
+       y = "% Change in Jump Height",
+       title = "Jump Height Decreases Prior to Injury",
+       subtitle = "(For Mens and Womens Basketball)") +
+  theme(plot.title = element_text(hjust = 0.5, vjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5, vjust = 0.5),
+        text = element_text(size = 20)) +
+  annotate("text", x = 1, y = -1.35, 
+           label = paste("Mean:", round(mean(three_day_bball$averaged_Jump_Height), 2)),
+           fontface = "bold", size = 5)
+
+# 3 Day Periods for Ankle
+p4 <- ggplot(data = three_day_ankle, aes(x = DaysDifference, y = averaged_Jump_Height)) +
+  geom_line() +
+  geom_line(y = 0, color = "blue") +
+  geom_line(y = mean(three_day_ankle$averaged_Jump_Height), color = "red", linetype = "dotted") +
+  scale_x_reverse() +
+  theme_minimal() +
+  labs(x = "Days Until Injury",
+       y = "",
+       title = "Jump Height Decreases Prior to Ankle Injury",
+       subtitle = "(For Mens and Womens Basketball)") +
+  theme(plot.title = element_text(hjust = 0.5, vjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5, vjust = 0.5),
+        text = element_text(size = 20)) +
+  annotate("text", x = 1.25, y = -2.15, 
+           label = paste("Mean:", round(mean(three_day_ankle$averaged_Jump_Height), 2)),
+           fontface = "bold", size = 5)
+
+# Run all of these at the same time
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+grid.lines(x = c(0.51, 0.51, 1.51, 1.51), y = c(0, 2), gp = gpar(col = "black"))
+grid.lines(x = c(0, 2), y = c(0.52, 0.52, 1.52, 1.52), gp = gpar(col = "black"))
+
+```
+
+## Proportional Hazards Model
+
+```{r}
+
+# Select Relevant Variables
+df_coxph <- combined_fp_injury %>% 
+  select(incident_date, `Test Date`, athlete_name, DaysDifference, ClosestTestToInjury, 
+         incident_sport, body_area, `RSI-modified [m/s]`, `Flight Time [ms]`, `Jump Height (Flight Time) [cm]`)
+
+
+# Separating Data into different timeframes
+df_coxph <- df_coxph %>% 
+  mutate(split_timeframe = ifelse(DaysDifference <= 90, 1, 0))
+
+df_coxph <- df_coxph %>% 
+  mutate(averaged_difference = ifelse(split_timeframe == 0, DaysDifference - 90, DaysDifference))
+
+# Setting incident sport as Factor
+df_coxph$incident_sport <- factor(df_coxph$incident_sport, levels = unique(df_coxph$incident_sport))
+
+# Setting Reference Level
+df_coxph$incident_sport <- relevel(df_coxph$incident_sport, ref = "Mens Basketball")
+
+# Fit Cox Proportional Hazards model
+cox_model <- coxph(Surv(averaged_difference, split_timeframe) ~ incident_sport + 
+                     `Flight Time [ms]` + `Jump Height (Flight Time) [cm]`, data = df_coxph)
+
+summary(cox_model)
+
+
+# Assuming cox_model is the result of coxph()
+survival_curves <- survfit(cox_model)
+plot(survival_curves, main = "Survival Curves")
+
+
+
+
+
+
+# Try it Basketball Specific
+
+
+bb_coxph <- df_coxph %>% 
+  filter(incident_sport == "Mens Basketball" | incident_sport == "Womens Basketball")
+
+# Setting incident sport as Factor
+bb_coxph$incident_sport <- factor(bb_coxph$incident_sport, levels = unique(bb_coxph$incident_sport))
+
+# Setting Reference Level
+bb_coxph$incident_sport <- relevel(bb_coxph$incident_sport, ref = "Mens Basketball")
+
+
+
+# Fit Cox Proportional Hazards model
+bb_cox_model <- coxph(Surv(averaged_difference, split_timeframe) ~ incident_sport + 
+                     `Flight Time [ms]` + `Jump Height (Flight Time) [cm]`, data = bb_coxph)
+
+summary(bb_cox_model)
+
+
+# Assuming bb_cox_model is the result of coxph()
+survival_curves <- survfit(bb_cox_model)
+plot(survival_curves, main = "Survival Curves")
+
+```
