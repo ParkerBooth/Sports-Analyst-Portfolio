@@ -19,6 +19,7 @@ This repository showcases my data analysis skills and relevant Data Analysis / S
 ## Projects
 
 
+
 ### [Volleyball Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/tree/main/Sports%20Science%20Projects/Volleyball%20Project)
 **Duration**: 4 months  
 **Program**: R
@@ -31,6 +32,7 @@ Two types of Bayesian models were run in this analysis using STAN: General Linea
 - **[Project Paper](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/7960%20Volleyball%20Data%20Project%20-%20Booth%20(2).pdf)**
 - **[Data Manipulation Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Sports%20Science%20Projects/Volleyball%20Project/Volleyball%20Portfolio%20File.Rmd)**
 - **[Stan Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Sports%20Science%20Projects/Volleyball%20Project/Volleyball%20Stan.R)**
+
 
 
 ### [Baseball Dashboard Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/tree/main/Sports%20Science%20Projects/Baseball%20Dashboard)
