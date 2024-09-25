@@ -17,7 +17,6 @@ This repository showcases my data analysis skills and relevant Data Analysis / S
 - [Contacts](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/README.md#contacts)
 
 ## Projects
-- Sports Science Projects
 
 ### [Volleyball Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/tree/main/Sports%20Science%20Projects/Volleyball%20Project)
 **Duration**: 4 months  
@@ -27,9 +26,9 @@ This repository showcases my data analysis skills and relevant Data Analysis / S
 
 - **Code**: [Link to Code](Link_to_Code)
 - **Presentation**: [Link to Presentation](Link_to_Presentation)
-- **Paper**: [Link to Paper](Link_to_Paper)
+- **[Volleyball Project Paper]**(https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/7960%20Volleyball%20Data%20Project%20-%20Booth%20(2).pdf)
 
-        - [Volleyball Project Paper](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/7960%20Volleyball%20Data%20Project%20-%20Booth%20(2).pdf)
+        - 
         - [Volleyball Project Presentation](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Volleyball%20Presentation.pdf)
         - [Baseball Dashboard](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Baseball%20Dashboard.png)
           
