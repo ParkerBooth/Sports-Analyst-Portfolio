@@ -18,11 +18,11 @@ This repository showcases my data analysis skills and relevant Data Analysis / S
 
 ## Projects
 - Sports Science Projects
-    - [#Volleyball Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/tree/main/Sports%20Science%20Projects/Volleyball%20Project)
-    - [Volleyball Project Paper](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/7960%20Volleyball%20Data%20Project%20-%20Booth%20(2).pdf)
-    - [Volleyball Project Presentation](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Volleyball%20Presentation.pdf)
-    - [Baseball Dashboard](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Baseball%20Dashboard.png)
-      
+    - ### [Volleyball Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/tree/main/Sports%20Science%20Projects/Volleyball%20Project)
+        - [Volleyball Project Paper](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/7960%20Volleyball%20Data%20Project%20-%20Booth%20(2).pdf)
+        - [Volleyball Project Presentation](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Volleyball%20Presentation.pdf)
+        - [Baseball Dashboard](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Baseball%20Dashboard.png)
+          
 - Economics Projects
     - [Event Study Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Event%20Study%20Code.do)
     
