@@ -1,10 +1,10 @@
 # Parker Booth - Sports Data Analyst Portfolio
 ## About
-Hello, I am Parker Booth! I have an analytical background in Quantitative Analysis, Business Analytics, and Econometrics. I am currently studying in the Master of Statistics program at the University of Utah. I am passionate about using my acquired data analysis skills in sports to help athletes reach their highest potential.
+Hello, I am Parker Booth! I have an analytical background in Quantitative Analysis, Business Analytics, and Econometrics. Currently, I am studying in the Master of Statistics program at the University of Utah, with plans to graduate in the Spring of 2025. I am passionate about using my acquired data analysis skills in the sports industry to help athletes reach their highest potential.
 
-During my studies, I have honed my analytical skills using economic data. I have done multiple projects with federal economic data that honed my skills. I primarily coded in R studio and Stata during this timeframe.
+Throughout my studies, I have honed my analytical skills using economic data through various projects with federal economic data. My primary tools for these projects were R programming and Stata. 
 
-I have experience in a sports setting at the University of Utah as a Sports Science Intern with the Applied Health & Performance Science department. This opportunity has given me experience with data analysis in a sports setting. I have done multiple projects with athlete data to improve athlete performance.
+I also have significant experience in a sports setting as a Sports Science Intern in the Applied Health & Performance Science department at the University of Utah. This opportunity has given me experience with data analysis in a sports setting using R programming and Power BI to analyze athlete data to improve performance.
 
 [My Resume](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Parker%20Booth%20Resume.pdf) 
 
@@ -14,18 +14,16 @@ This repository showcases my data analysis skills and relevant Data Analysis / S
 - [About](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/README.md#about)  
 - [Education](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/README.md#education)
 - [Projects](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/README.md#projects)
-  - R
-    
+- [Contacts](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/README.md#contacts)
+
+## Projects
+- Sports Science Projects
+    - [#Volleyball Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/tree/main/Sports%20Science%20Projects/Volleyball%20Project)
     - [Volleyball Project Paper](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/7960%20Volleyball%20Data%20Project%20-%20Booth%20(2).pdf)
-      
     - [Volleyball Project Presentation](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Volleyball%20Presentation.pdf)
-
-  - PowerBI
-
     - [Baseball Dashboard](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Baseball%20Dashboard.png)
       
-  - Stata
-    
+- Economics Projects
     - [Event Study Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Event%20Study%20Code.do)
     
     - [Learning Platform Market Research Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/4700-%20Market%20Research%20Project%20(2).pdf)
@@ -40,7 +38,7 @@ This repository showcases my data analysis skills and relevant Data Analysis / S
    
     - [How Smoking impacts Tax Rates Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/ResearchProject2.do)
   
-- [Contacts](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/README.md#contacts)
+
 
 
 
