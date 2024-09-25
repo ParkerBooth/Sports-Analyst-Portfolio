@@ -18,19 +18,34 @@ This repository showcases my data analysis skills and relevant Data Analysis / S
 
 ## Projects
 
+
 ### [Volleyball Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/tree/main/Sports%20Science%20Projects/Volleyball%20Project)
 **Duration**: 4 months  
 **Program**: R
 
-**Description**: Briefly describe what the project is about, the objectives, and any key findings or outcomes.
+**Description**: This project focused on finding the statistics and movements essential to winning volleyball games. The data used was two seasons of historical catapult data and matching game data from those two seasons. By collecting and analyzing this data, the goal was to provide answers to the questions about what movements within a game and practice drove wins for the volleyball team.
 
-- **Code**: [Link to Code](Link_to_Code)
-- **Presentation**: [Link to Presentation](Link_to_Presentation)
-- **Paper**: #### **[Volleyball Project Paper](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/7960%20Volleyball%20Data%20Project%20-%20Booth%20(2).pdf)**
+Two types of Bayesian models were run in this analysis using STAN: General Linear Regression Models and Logistic Models. These models were run using the stan package in R, allowing for a deep Bayesian analysis of how movements influenced match outcomes and statistics. This project not only deepened my experience with advanced statistical modeling but also reinforced data analysis's value in optimizing athlete performance.
 
-        - 
-        - [Volleyball Project Presentation](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Volleyball%20Presentation.pdf)
-        - [Baseball Dashboard](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Baseball%20Dashboard.png)
+- **[Presentation](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Volleyball%20Presentation.pdf)**
+- **[Project Paper](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/7960%20Volleyball%20Data%20Project%20-%20Booth%20(2).pdf)**
+- **[Data Manipulation Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Sports%20Science%20Projects/Volleyball%20Project/Volleyball%20Portfolio%20File.Rmd)**
+- **[Stan Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Sports%20Science%20Projects/Volleyball%20Project/Volleyball%20Stan.R)**
+
+
+### [Baseball Dashboard Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/tree/main/Sports%20Science%20Projects/Baseball%20Dashboard)
+**Duration**: 2 months  
+**Program**: Power BI
+
+**Description**: The goal of this project was to provide a printable dashboard of pitching statistics for coaches to use easily. This dashboard was my first experience using Power BI in a professional setting.
+
+The dashboard's capabilities allow coaches to easily select different pitchers and specific game dates to review individual performance metrics. The second tab of the dashboard has a slider that allows for the ability to specify a time frame for summarizing pitching statistics. Coaches can print this dashboard to show players at practice about their performance in the previous games or their overall season-long performances.
+
+- **[Screenshot of Dashboard](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Baseball%20Dashboard.png)**
+
+
+
+
           
 - Economics Projects
     - [Event Study Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Event%20Study%20Code.do)
