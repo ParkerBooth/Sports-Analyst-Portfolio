@@ -26,7 +26,7 @@ This repository showcases my data analysis skills and relevant Data Analysis / S
 
 - **Code**: [Link to Code](Link_to_Code)
 - **Presentation**: [Link to Presentation](Link_to_Presentation)
-- **[Volleyball Project Paper]**(https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/7960%20Volleyball%20Data%20Project%20-%20Booth%20(2).pdf)
+- **Paper**: #### **[Volleyball Project Paper](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/7960%20Volleyball%20Data%20Project%20-%20Booth%20(2).pdf)**
 
         - 
         - [Volleyball Project Presentation](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Volleyball%20Presentation.pdf)
