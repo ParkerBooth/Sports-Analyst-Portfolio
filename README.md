@@ -19,7 +19,6 @@ This repository showcases my data analysis skills and relevant Data Analysis / S
 ## Projects
 
 
-
 ### [Volleyball Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/tree/main/Sports%20Science%20Projects/Volleyball%20Project)
 **Duration**: 4 months  
 **Program**: R
@@ -79,20 +78,39 @@ Multiple angles of analysis were attempted in both stages, and while results wer
 
 
 
-- Economics Projects
-    - [Event Study Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Event%20Study%20Code.do)
-    
-    - [Learning Platform Market Research Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/4700-%20Market%20Research%20Project%20(2).pdf)
-   
-    - [Learning Platform Research Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/project%20do%20file.do)
-   
-    - [Affordable Housing Market Research Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Final%20Empirical%20Project%20(1).pdf)
-   
-    - [Affordable Housing Research Brief](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Final%20Empirical%20Project%20(1).pdf)
-   
-    - [How Smoking impacts Tax Rates](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Market%20Research%20Project%202%20(1).pdf)
-   
-    - [How Smoking impacts Tax Rates Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/ResearchProject2.do)
+### [Track & XC Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/tree/main/Sports%20Science%20Projects/Track%20%26%20XC%20Project)
+**Duration**: 3 months  
+**Program**: R
+
+**Description**: The project investigated the differences between the Track and Cross Country (XC) teams, who do not train together but will compete in similar or even the same events. This analysis focused on ForceDeck data and race times to see which metrics predicted performance for each team's best runners and how those differed.
+
+To answer this question, I implemented a hierarchical statistical model to better understand the team differences.  The project included exploratory analysis, distance comparisons, and team comparisons to uncover key insights into performance metrics.
+
+- **[Presentation](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Sports%20Science%20Projects/Track%20%26%20XC%20Project/Track%20%26%20XC%20Presentation.pdf)**
+- **[Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Sports%20Science%20Projects/Track%20%26%20XC%20Project/Track%20%26%20XC%20Code.Rmd)**
+
+
+
+### [Basketball End-of-Season Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/tree/main/Sports%20Science%20Projects/Basketball%20Project)
+**Duration**: 1 month  
+**Program**: R
+
+**Description**: This project aimed to provide an end-of-season analysis of the basketball team. This analysis used Strive in-season data. The main goals of this project were to provide meaningful visualizations that could be aggregated and report on season-long trends. Trends were analyzed by position and individually by player. This project showcases my visualization skills using the ggplot2 package in R. 
+
+- **[Screenshot of Dashboard](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Sports%20Science%20Projects/Basketball%20Project/End%20of%20Season%20Report%20Code.Rmd)**
+
+
+
+### [Football Height Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/tree/main/Sports%20Science%20Projects/Football%20Projects)
+**Duration**: 1 week  
+**Program**: R
+
+**Description**: This project was an impromptu question from the Head Coach of the football team. The main question was how much athletes in the football program have grown over the years. This included growth in height, wingspan, and hand size. This project was a quick look at a small data set showcasing my dplyr manipulation skills and an understanding of R programming. A quick turn around gave the coach a quick, insightful answer to his question.
+
+- **[Football Height Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Sports%20Science%20Projects/Football%20Projects/Football%20Height%20Code.Rmd)**
+
+
+
   
 
 
