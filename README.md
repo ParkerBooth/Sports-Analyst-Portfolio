@@ -43,7 +43,7 @@ Two types of Bayesian models were run in this analysis using STAN: General Linea
 
 The dashboard's capabilities allow coaches to easily select different pitchers and specific game dates to review individual performance metrics. The second tab of the dashboard has a slider that allows for the ability to specify a time frame for summarizing pitching statistics. Coaches can print this dashboard to show players at practice about their performance in the previous games or their overall season-long performances.
 
-- **[Screenshot of Dashboard](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/tree/main/Sports%20Science%20Projects/Baseball%20Dashboard)**
+- **[Screenshot of Dashboard](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Sports%20Science%20Projects/Baseball%20Dashboard/Baseball%20Dashboard.png)**
 
 
 
