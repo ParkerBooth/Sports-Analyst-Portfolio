@@ -97,7 +97,7 @@ To answer this question, I implemented a hierarchical statistical model to bette
 
 **Description**: This project aimed to provide an end-of-season analysis of the basketball team. This analysis used Strive in-season data. The main goals of this project were to provide meaningful visualizations that could be aggregated and report on season-long trends. Trends were analyzed by position and individually by player. This project showcases my visualization skills using the ggplot2 package in R. 
 
-- **[Screenshot of Dashboard](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Sports%20Science%20Projects/Basketball%20Project/End%20of%20Season%20Report%20Code.Rmd)**
+- **[Charting Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Sports%20Science%20Projects/Basketball%20Project/End%20of%20Season%20Report%20Code.Rmd)**
 
 
 
