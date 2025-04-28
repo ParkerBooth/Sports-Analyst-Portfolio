@@ -1,6 +1,6 @@
 # Parker Booth - Sports Analyst Portfolio
 ## About
-Hello, I am Parker Booth! I have an analytical background in Quantitative Analysis, Business Analytics, and Econometrics. Currently, I am studying in the Master of Statistics program at the University of Utah, with plans to graduate in the Spring of 2025. I am passionate about using my acquired data analysis skills in the sports industry to help athletes reach their highest potential.
+Hello, I am Parker Booth! I have an analytical background in statistics, quantitative analysis, business analytics, and econometrics. I am a Master's of statistics graduate from the University of Utah, and also have a Bachelor's degree in quantitative analysis of markets and organizations. I am passionate about using my acquired data analysis skills in the sports industry to help athletes reach their highest potential.
 
 Throughout my studies, I have honed my analytical skills using economic data through various projects with federal economic data. My primary tools for these projects were R programming and Stata. 
 
@@ -19,6 +19,21 @@ This repository showcases my data analysis skills and relevant Data Analysis / S
 ## Projects
 
 
+### [Master's Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/tree/main/Master's%20Project)
+***Receiving a top-five pick in the NBA lottery leads to success***
+
+**Duration**: 5 months  
+**Program**: R
+
+**Description**: This project was my final Master's project in the program. I spent 5 months researching NBA draft data to see if a top-five pick's effect in the NBA correlated with success. My goal was to find a clear correlation between winning and being a high draft pick, and when to expect this winning to happen.
+
+I utilized OLS regressions, negative binomial regressions, and event studies as the statistical frameworks for this analysis. These models predicted that just by having a top-five pick, the team is expected to increase in winning in years 3-6. Playoff and regular season wins become statistically different from the rookie season wins in most of these years.
+
+- **[Presentation](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Master's%20Project/Final%20Project%20NBA%20Presentation.pdf)**
+- **[Project Paper](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Master's%20Project/Master's%20Project%20Paper.pdf)**
+
+
+
 ### [Volleyball Project](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/tree/main/Sports%20Science%20Projects/Volleyball%20Project)
 **Duration**: 4 months  
 **Program**: R
@@ -31,6 +46,16 @@ Two types of Bayesian models were run in this analysis using STAN: General Linea
 - **[Project Paper](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Sports%20Science%20Projects/Volleyball%20Project/Volleyball%20Project%20Paper.pdf)**
 - **[Data Manipulation Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Sports%20Science%20Projects/Volleyball%20Project/Volleyball%20Portfolio%20File.Rmd)**
 - **[Stan Code](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/blob/main/Sports%20Science%20Projects/Volleyball%20Project/Volleyball%20Stan.R)**
+
+
+
+### [Football Metrics Dashboard](https://github.com/ParkerBooth/Sports-Analyst-Portfolio/tree/main/Sports%20Science%20Projects/Football%20Projects)
+**Duration**: 2 months  
+**Program**: Power BI
+
+**Description**: This project aimed to provide a dashboard of testing metrics that is easily accessible to coaches. The goal was to combine all of the metrics that Football values and showcase them in a one-stop shop. 
+
+The dashboard's capabilities allow coaches to select different players and dates to review individual metrics easily. The metrics covered in this dashboard come from Catapult, Vald ForceDecks, Body Weight, and Hydration. These metrics are all shown as z-scores to compare players to their prior 30-day averages for practice and load preparations. 
 
 
 
